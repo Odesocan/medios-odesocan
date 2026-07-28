@@ -1,165 +1,83 @@
-# Monitor de Medios Canarios
+# medios-odesocan
 
-Pipeline de scraping, NLP y visualización de prensa canaria.
+Procesamiento textual para la word cloud del Observatorio de Medios.
 
-## Estructura del proyecto
+## Enfoque
 
-```text
-canarias_monitor/
-│
-├── config.py          ← Medios, temáticas, rutas y parámetros
-├── scraper.py         ← Recolector RSS + HTML (este módulo)
-├── scheduler.py       ← Ejecución periódica
-├── nlp.py             ← (próximo) Clasificación y TF-IDF
-├── dashboard.py       ← App Dash interactiva conectada a Supabase
-│
-├── requirements.txt
-├── data/
-│   ├── noticias.db    ← SQLite con todas las noticias
-│   └── html_cache/    ← Caché de páginas descargadas
-└── logs/
-    └── scraper_YYYYMMDD.log
+No se añade un backend nuevo de serving. Supabase sigue siendo la fuente y el destino:
+
+1. GitHub Actions ejecuta el procesamiento.
+2. El script lee noticias desde Supabase.
+3. Calcula términos ponderando `titulo`, `resumen` y `contenido_limpio`.
+4. Escribe el agregado en `medios.wordcloud_terms`.
+5. El frontend puede consultar ya el agregado filtrado por `medio` y `tema`.
+
+## Variables necesarias
+
+Secrets de GitHub:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Variables opcionales de GitHub:
+
+- `SUPABASE_SOURCE_SCHEMA`
+- `SUPABASE_SOURCE_TABLE`
+- `SUPABASE_TARGET_SCHEMA`
+- `SUPABASE_TARGET_TABLE`
+- `WORDCLOUD_MAX_TERMS`
+- `WORDCLOUD_MIN_DOC_FREQ`
+
+## Configuración frontend
+
+La nube del [index.html](/Users/cristiancpv/Documents/Playground/medios-odesocan/index.html) ya no calcula términos en cliente. Ahora espera un objeto global como este antes del script principal:
+
+```html
+<script>
+window.__SUPABASE_CONFIG__ = {
+  url: 'https://TU-PROYECTO.supabase.co',
+  anonKey: 'TU_ANON_KEY',
+  schema: 'medios',
+  wordcloudTable: 'wordcloud_terms'
+};
+</script>
 ```
 
-## Instalación
+Si falta esa configuración, la tarjeta mostrará un mensaje explícito de configuración pendiente.
 
-```bash
-# 1. Crear entorno virtual
-python -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-# .venv\Scriptsctivate         # Windows
+## Supabase
 
-# 2. Instalar dependencias
-pip install -r requirements.txt
+Ejecuta primero:
 
-# 3. (Opcional) Modelo spaCy en español para el módulo NLP
-python -m spacy download es_core_news_md
+```sql
+\i supabase/wordcloud.sql
 ```
 
-## Configuración de Supabase
+La tabla destino queda con estos ejes:
 
-La sincronización con Supabase ya no lee credenciales desde `config.py`. Debes definirlas en variables de entorno o en un fichero `.env` dentro de esta carpeta.
+- global: `medio = null`, `tema = null`
+- por medio: `medio = x`, `tema = null`
+- por tema: `medio = null`, `tema = x`
+- por combinación: `medio = x`, `tema = y`
 
-```bash
-cat > .env <<'EOF'
-SUPABASE_HOST=aws-1-eu-west-1.pooler.supabase.com
-SUPABASE_PORT=5432
-SUPABASE_DBNAME=postgres
-SUPABASE_USER=tu_usuario
-SUPABASE_PASSWORD=tu_password
-SUPABASE_SCHEMA=medios
-SUPABASE_SSLMODE=require
-EOF
+## Lógica textual
+
+- `titulo` pesa `3`
+- `resumen` pesa `2`
+- `contenido_limpio` pesa `1`
+- se generan unigramas y bigramas
+- se calcula `score = tf * log(1 + N / df)`
+- se guardan ejemplos de titulares por término
+
+## Consulta esperada desde frontend
+
+Ejemplo conceptual:
+
+```sql
+select *
+from medios.wordcloud_terms
+where medio is not distinct from :medio
+  and tema is not distinct from :tema
+order by score desc
+limit 55;
 ```
-
-Si solo quieres scrapear en SQLite local, no hace falta configurar Supabase.
-
-## Uso
-
-### Scraping manual
-
-```bash
-# Todos los medios
-python scraper.py
-
-# Un medio específico
-python scraper.py --medio canarias7
-
-# Prueba sin guardar en BD
-python scraper.py --dry-run
-
-# Con extracción de texto completo de cada artículo (más lento)
-python scraper.py --articulos
-
-# Ver medios configurados
-python scraper.py --lista-medios
-```
-
-### Modo daemon (scheduler automático)
-
-```bash
-python scheduler.py
-# Ejecuta cada día a las 10:00 y, al terminar el scraping, sincroniza los pendientes con Supabase
-
-# Ejecutar ahora mismo una vez y salir
-python scheduler.py --run-now
-```
-
-### Cron (producción en Linux/macOS)
-
-```bash
-crontab -e
-
-# Añadir esta línea (ajusta las rutas):
-0 10 * * * /ruta/a/.venv/bin/python /ruta/a/canarias_monitor/scheduler.py >> /ruta/a/logs/cron.log 2>&1
-```
-
-### Dashboard interactivo
-
-Requiere que Supabase esté configurado y accesible.
-
-```bash
-python dashboard.py
-```
-
-Se abrirá en:
-
-```text
-http://127.0.0.1:8050
-```
-
-Variables opcionales:
-
-```bash
-DASH_HOST=0.0.0.0
-DASH_PORT=8050
-DASH_DEBUG=1
-```
-
-El dashboard incluye:
-
-- filtros por medio, tema, fecha y texto libre
-- KPIs de volumen, medios activos, tema dominante y último scrape
-- gráficos de evolución temporal, peso por medio, temas dominantes y cruce tema x medio
-- nube de palabras con titulares, resúmenes y texto completo
-- tabla con enlaces directos a las noticias almacenadas en Supabase
-
-## Consultar la BD directamente
-
-```python
-import sqlite3, pandas as pd
-
-conn = sqlite3.connect("data/noticias.db")
-
-# Todas las noticias de hoy
-df = pd.read_sql("""
-    SELECT medio, titulo, fecha_pub, url
-    FROM noticias
-    WHERE date(fecha_scrap) = date('now')
-    ORDER BY fecha_pub DESC
-""", conn)
-
-# Noticias por medio
-df.groupby("medio").size()
-```
-
-## Añadir un nuevo medio
-
-Edita `config.py` y añade una entrada en el diccionario `MEDIOS`:
-
-```python
-"nuevo_medio": {
-    "nombre":  "Nombre del Medio",
-    "color":   "#hex_color",
-    "url":     "https://www.ejemplo.com",
-    "rss": [
-        "https://www.ejemplo.com/feed/",
-    ],
-    "tipo": "rss_only",   # o "html_only" o "rss+html"
-    "selectores": {},      # solo si tipo incluye "html"
-},
-```
-
-## Próximos módulos
-
-- **nlp.py**: tokenización con spaCy, TF-IDF, clasificación temática automática, análisis de sentimiento

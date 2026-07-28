@@ -25,3 +25,5 @@ logs/
 
 # ── LaunchAgent (solo para uso local en Mac) ─────────────────────────────────
 *.plist
+.claude/
+.DS_Store
