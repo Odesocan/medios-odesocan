@@ -23,6 +23,13 @@ jobs:
 
       - name: Build wordcloud aggregates
         env:
+          # NOTA (mantenimiento automático 2026-08-05): a fecha de hoy
+          # SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY NO existen como
+          # secrets del repositorio (verificado con `gh secret list`).
+          # scripts/build_wordcloud_terms.py exige ambos con
+          # env_required() y lanza RuntimeError si faltan. Hay que
+          # añadirlos en Settings → Secrets and variables → Actions
+          # (usar la service_role key de Supabase, nunca la anon key).
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_SOURCE_SCHEMA: ${{ vars.SUPABASE_SOURCE_SCHEMA || 'medios' }}
