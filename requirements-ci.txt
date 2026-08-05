@@ -1,6 +1,8 @@
 # requirements-ci.txt — Dependencias para GitHub Actions (sin dashboard interactivo)
-# Para desarrollo local con dashboard Dash, usa: pip install -r requirements.txt
-# Última revisión: abril 2026
+# requirements.txt ya no instala un dashboard Dash: desde que se eliminó
+# dashboard.py (2026-03-24) solo contiene el cliente `supabase`, usado por
+# scripts/build_wordcloud_terms.py.
+# Última revisión: abril 2026 (comentario corregido en mantenimiento automático 2026-08-05)
 
 # ── Scraping ──────────────────────────────────────────────────────────────────
 feedparser==6.0.11
