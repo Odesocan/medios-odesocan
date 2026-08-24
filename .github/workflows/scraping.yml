@@ -9,6 +9,14 @@ on:
   schedule:
     # Cada día a las 10:00 UTC (11:00 hora Canarias)
     - cron: "0 10 * * *"
+    # NOTA (mantenimiento automático 2026-08-05): ningún workflow programado
+    # de este repositorio (ni este cron diario ni el cron horario de
+    # "Build Wordcloud Terms") se ha disparado por "schedule" desde el
+    # 2026-07-28T11:01Z — coincide con un build de GitHub Pages que quedó
+    # atascado en estado "building" desde ese mismo instante. Este commit
+    # re-registra el archivo de workflow como mitigación habitual para
+    # reactivar triggers "schedule" bloqueados. Si el cron sigue sin
+    # disparar tras el merge, contactar con el soporte de GitHub.
   workflow_dispatch:   # Permite ejecución manual desde la UI de GitHub Actions
     inputs:
       medio:
