@@ -2,16 +2,78 @@ name: Build Wordcloud Terms
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "15 * * * *"
+  # CRON PAUSADO (2026-08-26) — no borrado, comentado a propósito.
+  #
+  # Este workflow llevaba desde principios de agosto fallando en el 100% de sus
+  # ejecuciones programadas: una por hora, ~24 fallos al día, todos idénticos y
+  # todos por los secretos que faltan (ver el preflight de abajo). Un cron que
+  # nunca puede pasar no da señal, solo ruido, y ese ruido enterraba los fallos
+  # reales del resto de repositorios del Observatorio.
+  #
+  # Para reactivarlo: dar de alta SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY y
+  # descomentar las dos líneas siguientes.
+  #
+  # schedule:
+  #   - cron: "15 * * * *"
 
 jobs:
   build-wordcloud:
     runs-on: ubuntu-latest
 
+    env:
+      # SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY NO existen a día de hoy como
+      # secrets de este repositorio. Los que sí existen son los de conexión
+      # Postgres directa (SUPABASE_HOST/USER/PASSWORD…), que usa scraping.yml.
+      # scripts/build_wordcloud_terms.py necesita los del API REST, que son
+      # otros: hay que darlos de alta en Settings → Secrets and variables →
+      # Actions, usando la service_role key de Supabase y nunca la anon key.
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SOURCE_SCHEMA: ${{ vars.SUPABASE_SOURCE_SCHEMA || 'medios' }}
+      SUPABASE_SOURCE_TABLE: ${{ vars.SUPABASE_SOURCE_TABLE || 'noticias' }}
+      SUPABASE_TARGET_SCHEMA: ${{ vars.SUPABASE_TARGET_SCHEMA || 'medios' }}
+      SUPABASE_TARGET_TABLE: ${{ vars.SUPABASE_TARGET_TABLE || 'wordcloud_terms' }}
+      WORDCLOUD_MAX_TERMS: ${{ vars.WORDCLOUD_MAX_TERMS || '80' }}
+      WORDCLOUD_MIN_DOC_FREQ: ${{ vars.WORDCLOUD_MIN_DOC_FREQ || '2' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Antes de este paso, el fallo por secretos llegaba al final, tras
+      # instalar todo requirements.txt. Ahora corta en segundos y dice qué
+      # falta, sin imprimir nunca el valor de ningún secreto.
+      - name: Comprobar secretos obligatorios
+        run: |
+          set -uo pipefail
+          faltan=()
+          for nombre in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!nombre:-}" ]; then
+              faltan+=("${nombre}")
+            fi
+          done
+
+          if [ ${#faltan[@]} -eq 0 ]; then
+            echo "OK — los 2 secretos obligatorios tienen valor."
+            exit 0
+          fi
+
+          echo "::error::Faltan ${#faltan[@]} secreto(s): ${faltan[*]}"
+          {
+            echo "### Secretos sin dar de alta"
+            echo
+            for nombre in "${faltan[@]}"; do
+              echo "- \`${nombre}\`"
+            done
+            echo
+            echo "\`scripts/build_wordcloud_terms.py\` los exige con \`env_required()\`."
+            echo
+            echo "Alta en **Settings → Secrets and variables → Actions**, con la"
+            echo "**service_role** key de Supabase — nunca la \`anon\` key."
+            echo
+            echo "Hecho eso, descomentar el \`schedule\` de este workflow."
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -22,20 +84,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build wordcloud aggregates
-        env:
-          # NOTA (mantenimiento automático 2026-08-05): a fecha de hoy
-          # SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY NO existen como
-          # secrets del repositorio (verificado con `gh secret list`).
-          # scripts/build_wordcloud_terms.py exige ambos con
-          # env_required() y lanza RuntimeError si faltan. Hay que
-          # añadirlos en Settings → Secrets and variables → Actions
-          # (usar la service_role key de Supabase, nunca la anon key).
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_SOURCE_SCHEMA: ${{ vars.SUPABASE_SOURCE_SCHEMA || 'medios' }}
-          SUPABASE_SOURCE_TABLE: ${{ vars.SUPABASE_SOURCE_TABLE || 'noticias' }}
-          SUPABASE_TARGET_SCHEMA: ${{ vars.SUPABASE_TARGET_SCHEMA || 'medios' }}
-          SUPABASE_TARGET_TABLE: ${{ vars.SUPABASE_TARGET_TABLE || 'wordcloud_terms' }}
-          WORDCLOUD_MAX_TERMS: ${{ vars.WORDCLOUD_MAX_TERMS || '80' }}
-          WORDCLOUD_MIN_DOC_FREQ: ${{ vars.WORDCLOUD_MIN_DOC_FREQ || '2' }}
         run: python scripts/build_wordcloud_terms.py
