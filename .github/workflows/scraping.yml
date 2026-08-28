@@ -7,16 +7,10 @@ name: Scraping medios canarios
  
 on:
   schedule:
-    # Cada día a las 10:00 UTC (11:00 hora Canarias)
+    # Cada día a las 10:00 UTC (11:00 hora Canarias). GitHub encola los crons
+    # con retraso variable: la hora real de arranque oscila entre las 10:00 y
+    # las 20:00 UTC. Es comportamiento normal de la plataforma, no un fallo.
     - cron: "0 10 * * *"
-    # NOTA (mantenimiento automático 2026-08-05): ningún workflow programado
-    # de este repositorio (ni este cron diario ni el cron horario de
-    # "Build Wordcloud Terms") se ha disparado por "schedule" desde el
-    # 2026-07-28T11:01Z — coincide con un build de GitHub Pages que quedó
-    # atascado en estado "building" desde ese mismo instante. Este commit
-    # re-registra el archivo de workflow como mitigación habitual para
-    # reactivar triggers "schedule" bloqueados. Si el cron sigue sin
-    # disparar tras el merge, contactar con el soporte de GitHub.
   workflow_dispatch:   # Permite ejecución manual desde la UI de GitHub Actions
     inputs:
       medio:
@@ -33,7 +27,6 @@ jobs:
     timeout-minutes: 30
  
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"  
       SUPABASE_HOST:     ${{ secrets.SUPABASE_HOST }}
       SUPABASE_PORT:     ${{ secrets.SUPABASE_PORT }}
       SUPABASE_DBNAME:   ${{ secrets.SUPABASE_DBNAME }}
@@ -44,14 +37,14 @@ jobs:
  
     steps:
       - name: Checkout repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
  
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: requirements-ci.txt   # ← AÑADIR ESTA LÍNEA
+          cache-dependency-path: requirements-ci.txt
  
       - name: Instalar dependencias del sistema
         run: |

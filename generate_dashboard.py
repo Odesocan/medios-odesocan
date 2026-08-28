@@ -141,7 +141,16 @@ def construir_datos(noticias: list[dict]) -> dict:
 
 # ── Inyección en el HTML ─────────────────────────────────────────────────────
 
-def generar_html(datos: dict, output: Path, dry_run: bool = False) -> None:
+def generar_html(datos: dict, output: Path, dry_run: bool = False) -> bool:
+    """Inyecta los datos en el HTML.
+
+    Devuelve True si el HTML se ha reescrito y False si no había nada que
+    inyectar. El segundo caso no es un error: desde que `index.html` carga sus
+    datos de Supabase en el navegador (`fetchNoticias`), el bloque estático
+    `const MM=[…] … const NW=[…];` ya no existe en el fichero y esta inyección
+    quedó obsoleta. Se devuelve el estado para que quien llame no anuncie un
+    éxito que no ha ocurrido.
+    """
     html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
     MM, TM, HM, TD, NW = datos["MM"], datos["TM"], datos["HM"], datos["TD"], datos["NW"]
@@ -169,8 +178,12 @@ def generar_html(datos: dict, output: Path, dry_run: bool = False) -> None:
         count=1,
     )
     if html_nuevo == html:
-        log.warning("No se encontró el bloque de datos para reemplazar — revisa el HTML.")
-        return
+        log.info(
+            "%s no contiene bloque de datos estático: el dashboard se alimenta "
+            "de Supabase en el navegador. No hay nada que regenerar.",
+            DASHBOARD_HTML.name,
+        )
+        return False
 
     # Actualiza badges de cabecera
     html_nuevo = re.sub(r'(<span>)\d+(</span> noticias)', rf'\g<1>{total}\g<2>', html_nuevo)
@@ -187,23 +200,24 @@ def generar_html(datos: dict, output: Path, dry_run: bool = False) -> None:
     if dry_run:
         log.info("[DRY-RUN] Se generaría → %s (%d noticias, %d medios, %d temas)",
                  output, total, num_medios, num_temas)
-        return
+        return True
 
     output.write_text(html_nuevo, encoding="utf-8")
     log.info("✓ Dashboard actualizado → %s [%d noticias · %d medios · %d temas activos]",
              output, total, num_medios, num_temas)
+    return True
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
-def main(output: Path | None = None, dry_run: bool = False) -> None:
+def main(output: Path | None = None, dry_run: bool = False) -> bool:
     _configurar_logging()
     out = output or DASHBOARD_HTML
     log.info("Cargando noticias desde BD…")
     noticias = cargar_noticias()
     log.info("%d noticias en BD", len(noticias))
     datos = construir_datos(noticias)
-    generar_html(datos, out, dry_run=dry_run)
+    return generar_html(datos, out, dry_run=dry_run)
 
 
 if __name__ == "__main__":

@@ -60,11 +60,16 @@ def job() -> None:
     except Exception as e:
         log.error("✗ Error en sincronización Supabase: %s", e, exc_info=True)
 
-    # Regenerar dashboard D3 con datos frescos
+    # Regenerar dashboard D3 con datos frescos.
+    # `index.html` carga sus datos de Supabase desde el navegador, así que lo
+    # habitual es que no haya nada que reescribir. Se registra el resultado real
+    # para no dar por bueno un paso que no ha hecho nada.
     try:
         from generate_dashboard import main as generar_dashboard
-        generar_dashboard()
-        log.info("✓ Dashboard D3 regenerado")
+        if generar_dashboard():
+            log.info("✓ Dashboard D3 regenerado")
+        else:
+            log.info("• Dashboard D3 sin cambios (index.html se sirve desde Supabase)")
     except Exception as e:
         log.error("✗ Error regenerando dashboard D3: %s", e, exc_info=True)
 
