@@ -50,6 +50,19 @@ $$;
 
 grant select on medios.wordcloud_terms to anon, authenticated;
 
+-- Acceso de service_role al esquema.
+-- El esquema `medios` se creó concediendo acceso a anon y authenticated, pero
+-- nunca a service_role, que no tenía ni USAGE. Sin esto el pipeline falla al
+-- leer las noticias con:
+--   permission denied for schema medios (42501)
+-- service_role tiene BYPASSRLS, pero eso solo salta las políticas RLS: no
+-- sustituye a los GRANT. Se conceden solo los privilegios que necesita
+-- scripts/build_wordcloud_terms.py — leer la fuente y escribir el agregado —,
+-- así que si en el futuro el script lee otra tabla habrá que ampliarlos.
+grant usage  on schema medios to service_role;
+grant select on medios.noticias to service_role;
+grant select, insert, update on medios.wordcloud_terms to service_role;
+
 -- Función de truncado que invoca scripts/build_wordcloud_terms.py.
 -- Es SECURITY DEFINER y recibe esquema y tabla por parámetro, de modo que puede
 -- truncar cualquier tabla de la base de datos. Hay que restringir quién la

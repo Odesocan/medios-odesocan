@@ -2,14 +2,13 @@
 """
 Construye agregados de word cloud a partir de noticias almacenadas en Supabase.
 
-Fuente esperada por fila:
+Fuente esperada por fila (columnas reales de medios.noticias):
 - id
 - medio
-- fecha
 - temas (array o string separada por comas)
 - titulo
 - resumen
-- contenido_limpio
+- texto_full
 
 Destino:
 - tabla wordcloud_terms con agregados por:
@@ -46,18 +45,17 @@ UPSERT_CHUNK_SIZE = int(os.getenv("WORDCLOUD_UPSERT_CHUNK_SIZE", "500"))
 
 SOURCE_COLUMNS = [
     "id",
-    "fecha",
     "medio",
     "temas",
     "titulo",
     "resumen",
-    "contenido_limpio",
+    "texto_full",
 ]
 
 FIELD_WEIGHTS = {
     "titulo": 3.0,
     "resumen": 2.0,
-    "contenido_limpio": 1.0,
+    "texto_full": 1.0,
 }
 
 SPANISH_STOPWORDS = {
@@ -89,7 +87,7 @@ class NewsItem:
     temas: Tuple[str, ...]
     titulo: str
     resumen: str
-    contenido_limpio: str
+    texto_full: str
 
 
 def env_required(name: str) -> str:
@@ -194,7 +192,7 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
             client.schema(SOURCE_SCHEMA)
             .table(SOURCE_TABLE)
             .select(",".join(SOURCE_COLUMNS))
-            .order("fecha", desc=True)
+            .order("id", desc=True)
             .range(offset, offset + BATCH_SIZE - 1)
         )
         response = query.execute()
@@ -209,7 +207,7 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
                     temas=parse_topics(row.get("temas")),
                     titulo=str(row.get("titulo") or "").strip(),
                     resumen=str(row.get("resumen") or "").strip(),
-                    contenido_limpio=str(row.get("contenido_limpio") or "").strip(),
+                    texto_full=str(row.get("texto_full") or "").strip(),
                 )
             )
         if len(batch) < BATCH_SIZE:
