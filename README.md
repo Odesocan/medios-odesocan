@@ -58,22 +58,30 @@ cuatro ejes de agrupación:
 - por tema: `medio = null`, `tema = x`
 - por combinación: `medio = x`, `tema = y`
 
-**Este pipeline nunca ha llegado a ejecutarse.** Faltan tres piezas:
+Aprovisionamiento (estado a 2026-08-29):
 
-1. **Secrets del repositorio** — `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`
-   no existen. Se añaden en *Settings → Secrets and variables → Actions*.
+1. **Secrets del repositorio** — `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`,
+   añadidos. Se configuran en *Settings → Secrets and variables → Actions*.
    La segunda debe ser la *service_role* key (el script escribe en la base de
    datos y necesita saltarse RLS), nunca la *anon* key.
-2. **Esquema en Supabase** — aplicar `supabase/wordcloud.sql`. Ni la tabla
-   `medios.wordcloud_terms` ni la función `public.truncate_wordcloud_terms`
-   existen todavía en el proyecto, y el script necesita ambas.
-3. **Consumo desde el frontend** — `index.html` no lee `wordcloud_terms`;
-   sigue calculando la nube en cliente. Mientras no se conecte, la tabla se
-   rellenaría sin que nadie la use.
+2. **Esquema en Supabase** — `supabase/wordcloud.sql` aplicado. Crea
+   `medios.wordcloud_terms` con RLS y lectura pública, su índice, y la función
+   `public.truncate_wordcloud_terms`, restringida a `service_role`.
+3. **Consumo desde el frontend** — *pendiente*. `index.html` no lee
+   `wordcloud_terms`: sigue calculando la nube en cliente a partir de los
+   titulares (`drawWC()`). Hasta que se conecte, la tabla se rellena sin que
+   nadie la use, así que conviene decidir si se completa la integración o se
+   retira el workflow.
 
-Mientras falte (1), el workflow omite el paso de build y explica el motivo en
-el resumen del job, en vez de fallar a diario. En cuanto se añadan los secrets
-y se aplique el SQL, se ejecuta solo sin tocar nada más.
+Si falta alguno de los secrets, el workflow omite el paso de build y explica el
+motivo en el resumen del job, en lugar de fallar.
+
+La función de truncado es `security definer` y recibe esquema y tabla por
+parámetro, así que puede truncar cualquier tabla. No basta con revocarla de
+`PUBLIC`: Supabase concede `EXECUTE` explícitamente a `anon` y `authenticated`
+sobre las funciones nuevas de `public`, y la *anon* key de este proyecto es
+pública. El fichero SQL revoca ambas por separado; si se recrea la función,
+hay que volver a revocarlas.
 
 Variables opcionales (como *repository variables*, con estos valores por
 defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
