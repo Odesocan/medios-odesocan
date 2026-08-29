@@ -20,6 +20,7 @@ Destino:
 
 from __future__ import annotations
 
+import html
 import math
 import os
 import re
@@ -142,6 +143,13 @@ def normalize_display(text: str) -> str:
 def tokenize(text: str) -> List[str]:
     if not text:
         return []
+    # Cerca de una quinta parte de los textos llega con entidades HTML sin
+    # decodificar ("presentaci&oacute;n"). Sin este paso el tokenizador las
+    # parte en dos: un término basura ("oacute", "iacute", "nbsp", "quot") y un
+    # resto mutilado ("presentaci"). En la primera ejecución real, cuatro de los
+    # ocho términos globales con más score eran entidades. Para un texto sin
+    # entidades, unescape() no cambia nada.
+    text = html.unescape(text)
     tokens = []
     for match in TOKEN_RE.findall(text):
         display = normalize_display(match)
