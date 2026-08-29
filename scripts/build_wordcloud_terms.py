@@ -2,14 +2,13 @@
 """
 Construye agregados de word cloud a partir de noticias almacenadas en Supabase.
 
-Fuente esperada por fila:
+Fuente esperada por fila (columnas reales de medios.noticias):
 - id
 - medio
-- fecha
 - temas (array o string separada por comas)
 - titulo
 - resumen
-- contenido_limpio
+- texto_full
 
 Destino:
 - tabla wordcloud_terms con agregados por:
@@ -21,6 +20,7 @@ Destino:
 
 from __future__ import annotations
 
+import html
 import math
 import os
 import re
@@ -46,18 +46,17 @@ UPSERT_CHUNK_SIZE = int(os.getenv("WORDCLOUD_UPSERT_CHUNK_SIZE", "500"))
 
 SOURCE_COLUMNS = [
     "id",
-    "fecha",
     "medio",
     "temas",
     "titulo",
     "resumen",
-    "contenido_limpio",
+    "texto_full",
 ]
 
 FIELD_WEIGHTS = {
     "titulo": 3.0,
     "resumen": 2.0,
-    "contenido_limpio": 1.0,
+    "texto_full": 1.0,
 }
 
 SPANISH_STOPWORDS = {
@@ -89,7 +88,7 @@ class NewsItem:
     temas: Tuple[str, ...]
     titulo: str
     resumen: str
-    contenido_limpio: str
+    texto_full: str
 
 
 def env_required(name: str) -> str:
@@ -100,9 +99,26 @@ def env_required(name: str) -> str:
 
 
 def get_client() -> Client:
-    url = env_required("SUPABASE_URL")
-    key = env_required("SUPABASE_SERVICE_ROLE_KEY")
-    return create_client(url, key)
+    # Se comprueban las dos a la vez: si faltan ambas, conviene enterarse de
+    # golpe y no de una en una en ejecuciones sucesivas.
+    faltan = [
+        nombre
+        for nombre in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
+        if not os.getenv(nombre)
+    ]
+    if faltan:
+        raise RuntimeError(
+            "Faltan variables de entorno obligatorias: "
+            + ", ".join(faltan)
+            + ". Se configuran como secrets del repositorio en "
+            "Settings → Secrets and variables → Actions. "
+            "SUPABASE_SERVICE_ROLE_KEY debe ser la service_role key del "
+            "proyecto, no la anon key."
+        )
+    return create_client(
+        env_required("SUPABASE_URL"),
+        env_required("SUPABASE_SERVICE_ROLE_KEY"),
+    )
 
 
 def strip_accents(text: str) -> str:
@@ -127,6 +143,13 @@ def normalize_display(text: str) -> str:
 def tokenize(text: str) -> List[str]:
     if not text:
         return []
+    # Cerca de una quinta parte de los textos llega con entidades HTML sin
+    # decodificar ("presentaci&oacute;n"). Sin este paso el tokenizador las
+    # parte en dos: un término basura ("oacute", "iacute", "nbsp", "quot") y un
+    # resto mutilado ("presentaci"). En la primera ejecución real, cuatro de los
+    # ocho términos globales con más score eran entidades. Para un texto sin
+    # entidades, unescape() no cambia nada.
+    text = html.unescape(text)
     tokens = []
     for match in TOKEN_RE.findall(text):
         display = normalize_display(match)
@@ -177,7 +200,7 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
             client.schema(SOURCE_SCHEMA)
             .table(SOURCE_TABLE)
             .select(",".join(SOURCE_COLUMNS))
-            .order("fecha", desc=True)
+            .order("id", desc=True)
             .range(offset, offset + BATCH_SIZE - 1)
         )
         response = query.execute()
@@ -192,7 +215,7 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
                     temas=parse_topics(row.get("temas")),
                     titulo=str(row.get("titulo") or "").strip(),
                     resumen=str(row.get("resumen") or "").strip(),
-                    contenido_limpio=str(row.get("contenido_limpio") or "").strip(),
+                    texto_full=str(row.get("texto_full") or "").strip(),
                 )
             )
         if len(batch) < BATCH_SIZE:
@@ -354,4 +377,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Un fallo de configuración es un mensaje de una línea, no un traceback:
+    # el traceback no aporta nada cuando lo que falta es un secret.
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None

@@ -1,9 +1,24 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Build Wordcloud Terms — ODESOCAN
+# Recalcula el agregado textual `medios.wordcloud_terms` a partir de las
+# noticias que el scraping diario deja en Supabase.
+#
+# ESTADO ACTUAL (auditoría 2026-08-28): el pipeline NO está aprovisionado.
+# Faltan las tres piezas que documenta el README (sección "Word cloud
+# agregada"). Mientras falte alguna, el paso de build se omite de forma
+# controlada y el motivo se publica en el resumen del job, en lugar de
+# reventar con un traceback en cada ejecución.
+# ──────────────────────────────────────────────────────────────────────────────
+
 name: Build Wordcloud Terms
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 * * * *"
+    # Una vez al día, después del scraping diario ("Scraping medios canarios",
+    # 10:00 UTC + ~15 min de ejecución). Antes era "15 * * * *" (cada hora):
+    # 24 ejecuciones diarias para una fuente que solo cambia una vez al día.
+    - cron: "0 12 * * *"
 
 jobs:
   build-wordcloud:
@@ -11,25 +26,64 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Comprobar prerrequisitos
+        id: preflight
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          faltan=()
+          [ -n "$SUPABASE_URL" ]              || faltan+=("SUPABASE_URL")
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || faltan+=("SUPABASE_SERVICE_ROLE_KEY")
+
+          if [ ${#faltan[@]} -eq 0 ]; then
+            echo "listo=true" >> "$GITHUB_OUTPUT"
+            echo "### ✅ Prerrequisitos presentes" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Se ejecuta \`scripts/build_wordcloud_terms.py\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Si falla contra la base de datos, comprueba que \`supabase/wordcloud.sql\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "esté aplicado: crea la tabla \`medios.wordcloud_terms\` y la función" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`public.truncate_wordcloud_terms\`, ambas obligatorias para el script." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "listo=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ⏭️ Build omitido — configuración pendiente"
+            echo ""
+            echo "Faltan estos secrets del repositorio:"
+            echo ""
+            for s in "${faltan[@]}"; do echo "- \`$s\`"; done
+            echo ""
+            echo "Se añaden en **Settings → Secrets and variables → Actions**."
+            echo "\`SUPABASE_SERVICE_ROLE_KEY\` debe ser la *service_role* key del"
+            echo "proyecto Supabase, nunca la *anon* key (el script escribe en la"
+            echo "base de datos y necesita saltarse RLS)."
+            echo ""
+            echo "Además, antes de la primera ejecución real hay que aplicar"
+            echo "\`supabase/wordcloud.sql\` en el proyecto: crea la tabla"
+            echo "\`medios.wordcloud_terms\` y la función \`public.truncate_wordcloud_terms\`."
+            echo ""
+            echo "El job termina en verde a propósito: sin estas piezas el script no"
+            echo "puede funcionar, y fallar a diario no aporta información nueva."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        if: steps.preflight.outputs.listo == 'true'
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.preflight.outputs.listo == 'true'
         run: pip install -r requirements.txt
 
       - name: Build wordcloud aggregates
+        if: steps.preflight.outputs.listo == 'true'
         env:
-          # NOTA (mantenimiento automático 2026-08-05): a fecha de hoy
-          # SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY NO existen como
-          # secrets del repositorio (verificado con `gh secret list`).
-          # scripts/build_wordcloud_terms.py exige ambos con
-          # env_required() y lanza RuntimeError si faltan. Hay que
-          # añadirlos en Settings → Secrets and variables → Actions
-          # (usar la service_role key de Supabase, nunca la anon key).
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_SOURCE_SCHEMA: ${{ vars.SUPABASE_SOURCE_SCHEMA || 'medios' }}
