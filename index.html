@@ -538,7 +538,7 @@ footer {
 
   <div class="card">
     <div class="card-header">
-      <div><div class="card-title">Nube de Palabras</div><div class="card-subtitle">Términos más frecuentes en los titulares</div></div>
+      <div><div class="card-title">Nube de Palabras</div><div class="card-subtitle" id="sub-wc">Términos más relevantes</div></div>
       <div class="card-chip" id="chip-wc">—</div>
     </div>
     <div class="card-body"><svg id="wc"></svg></div>
@@ -1033,25 +1033,118 @@ function initHeatmapScroller() {
 // ═══════════════════════════════════════════════════════
 //  5. WORD CLOUD
 // ═══════════════════════════════════════════════════════
-function drawWC() {
-  const s = d3.select('#wc'); s.selectAll('*').remove();
+// Los términos salen de `medios.wordcloud_terms`, el agregado que reconstruye a
+// diario el workflow "Build Wordcloud Terms". Ese agregado pondera titulo (x3),
+// resumen (x2) y texto_full (x1) sobre el artículo completo y añade bigramas;
+// el cálculo local solo veía frecuencias crudas de titular.
+//
+// La tabla trae cuatro ámbitos precalculados que se corresponden uno a uno con
+// los filtros de medio y tema. El filtro de fechas no interviene, igual que
+// antes: filtNW() nunca ha filtrado por fecha.
+//
+// Si el agregado falla o no tiene filas para el ámbito activo, se recurre al
+// cálculo en cliente sobre los titulares. Así la tarjeta sigue mostrando algo
+// aunque el pipeline se rompa o aún no haya poblado un ámbito concreto.
+
+const WC_TERMS = { cache: new Map(), enCurso: new Set() };
+
+function wcScopeKey() {
+  const medio = S.medio !== 'todos' ? S.medio : null;
+  const tema  = S.tema  !== 'todos' ? S.tema  : null;
+  if (!medio && !tema) return '__all__';
+  if (medio && !tema)  return 'medio:' + medio;
+  if (!medio && tema)  return 'tema:' + tema;
+  return 'medio:' + medio + '|tema:' + tema;
+}
+
+async function fetchWordcloudTerms(scopeKey) {
+  const url = SUPABASE_URL + '/rest/v1/wordcloud_terms'
+    + '?select=term,score,doc_freq'
+    + '&scope_key=eq.' + encodeURIComponent(scopeKey)
+    + '&order=score.desc&limit=55';
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Accept': 'application/json',
+      // wordcloud_terms vive en el esquema `medios`, no en `public`: sin esta
+      // cabecera PostgREST responde 404 (PGRST205).
+      'Accept-Profile': 'medios'
+    }
+  });
+  if (!res.ok) throw new Error('wordcloud_terms: HTTP ' + res.status);
+  const filas = await res.json();
+  return filas.map(f => ({ text: f.term, peso: f.score, docs: f.doc_freq }));
+}
+
+// Vía de respaldo: el cálculo en cliente que había hasta ahora.
+function wcDesdeTitulares() {
   const data = filtNW();
   const allTitles = (data.length > 0 ? data : NW).map(d => d.titulo).join(' ');
   const stop = new Set(['de', 'la', 'el', 'en', 'a', 'y', 'que', 'los', 'las', 'por', 'con', 'del', 'se', 'un', 'una', 'al', 'es', 'para', 'no', 'su', 'más', 'como', 'ha', 'lo', 'le', 'si', 'son', 'sus', 'sobre', 'entre', 'pero', 'o', 'también', 'ya', 'este', 'esta', 'han', 'hay', 'ante', 'fue', 'ni', 'muy', 'hasta', 'desde', 'tras', 'sin', 'cuando', 'todo', 'hace', 'puede', 'les', 'esto', 'cada', 'todos', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nuevo', 'nueva', 'gran', 'estos', 'estas', 'ser', 'sido', 'has', 'tienen', 'sera', 'será', 'año', 'años']);
   const freq = {};
   allTitles.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !stop.has(w)).forEach(w => { freq[w] = (freq[w] || 0) + 1 });
-  const words = Object.entries(freq).map(([text, count]) => ({ text, count })).sort((a, b) => b.count - a.count).slice(0, 55);
+  return Object.entries(freq).map(([text, count]) => ({ text, peso: count, docs: count }))
+    .sort((a, b) => b.peso - a.peso).slice(0, 55);
+}
+
+function wcLienzo() {
+  const s = d3.select('#wc'); s.selectAll('*').remove();
   const ctr = s.node().parentElement;
   const W = ctr.clientWidth - 4, H = 420;
   s.attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H);
-  if (!words.length) { s.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle').style('fill', cssVar('--muted')).text('Sin datos suficientes'); return }
-  const maxC = words[0].count, minC = words[words.length - 1].count;
-  const sz = d3.scaleLog().domain([Math.max(1, minC), Math.max(2, maxC)]).range([13, 48]).clamp(true);
+  return { s, W, H };
+}
+
+function wcMensaje(texto) {
+  const { s, W, H } = wcLienzo();
+  s.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle')
+    .style('fill', cssVar('--muted')).text(texto);
+}
+
+function drawWC() {
+  const key = wcScopeKey();
+
+  if (WC_TERMS.cache.has(key)) {
+    const agregado = WC_TERMS.cache.get(key);
+    // El respaldo se calcula aquí, no al cachear: depende del filtro vigente.
+    if (agregado && agregado.length) renderWC(agregado, 'agregado');
+    else renderWC(wcDesdeTitulares(), 'titulares');
+    return;
+  }
+
+  wcMensaje('Cargando términos…');
+  if (WC_TERMS.enCurso.has(key)) return;
+  WC_TERMS.enCurso.add(key);
+
+  fetchWordcloudTerms(key)
+    .catch(err => { console.warn('Word cloud: agregado no disponible, se calcula en cliente.', err); return null; })
+    .then(filas => {
+      WC_TERMS.cache.set(key, filas);
+      WC_TERMS.enCurso.delete(key);
+      // Solo repintar si el usuario no ha cambiado de filtro mientras cargaba.
+      if (wcScopeKey() === key) drawWC();
+    });
+}
+
+function renderWC(words, fuente) {
+  const { s, W, H } = wcLienzo();
+  if (!words.length) {
+    s.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle')
+      .style('fill', cssVar('--muted')).text('Sin datos suficientes');
+    document.getElementById('chip-wc').textContent = '—';
+    return;
+  }
+  const pesos = words.map(w => w.peso);
+  // scaleLog exige dominio positivo y con extremos distintos.
+  const minP = Math.max(1e-6, d3.min(pesos));
+  const maxP = Math.max(minP * 2, d3.max(pesos));
+  const sz = d3.scaleLog().domain([minP, maxP]).range([13, 48]).clamp(true);
   const pal = ['#4f9cf9', '#f97316', '#22d3a5', '#c084fc', '#f43f5e', '#fbbf24', '#34d399', '#a78bfa', '#f472b6', '#67e8f9', '#86efac', '#fdba74', '#fca5a5'];
   const g = s.append('g').attr('transform', `translate(${W / 2},${H / 2})`);
   const placed = [];
   words.forEach((w, i) => {
-    const fs = sz(w.count);
+    const fs = sz(w.peso);
     const estW = w.text.length * fs * 0.56 + 6; const estH = fs * 1.15;
     const col = pal[i % pal.length];
     let found = false, ang = 0, r = 2, step = 0.42, tries = 0;
@@ -1064,9 +1157,15 @@ function drawWC() {
           const t = g.append('text').attr('class', 'wc-word').attr('x', x).attr('y', y).attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
             .style('font-size', `${fs}px`)
             .style('font-family', fs > 24 ? 'Lora,Georgia,serif' : 'Sora,sans-serif')
-            .style('font-weight', w.count >= 5 ? '600' : '400')
+            .style('font-weight', w.docs >= 5 ? '600' : '400')
             .style('fill', col).style('opacity', .88).text(w.text);
-          t.on('mousemove', (e) => { tip(e, `<strong>${w.text}</strong>Frecuencia: <b>${w.count}</b> titular${w.count !== 1 ? 'es' : ''}`); s.classed('wc-hover', true); t.classed('wc-focus', true) })
+          t.on('mousemove', (e) => {
+              const detalle = fuente === 'agregado'
+                ? `Aparece en <b>${w.docs}</b> noticia${w.docs !== 1 ? 's' : ''}`
+                : `Frecuencia: <b>${w.docs}</b> titular${w.docs !== 1 ? 'es' : ''}`;
+              tip(e, `<strong>${w.text}</strong>${detalle}`);
+              s.classed('wc-hover', true); t.classed('wc-focus', true);
+            })
             .on('mouseleave', (e) => { htip(e); s.classed('wc-hover', false); t.classed('wc-focus', false) })
             .on('click', () => {
               document.querySelectorAll('#tb tr').forEach(r => r.style.background = '');
@@ -1083,6 +1182,9 @@ function drawWC() {
     }
   });
   document.getElementById('chip-wc').textContent = `top ${Math.min(words.length, 55)} términos`;
+  document.getElementById('sub-wc').textContent = fuente === 'agregado'
+    ? 'Ponderado sobre titular, resumen y cuerpo'
+    : 'Frecuencia en titulares (cálculo local)';
 }
 
 // ═══════════════════════════════════════════════════════
