@@ -60,22 +60,26 @@ FIELD_WEIGHTS = {
 }
 
 SPANISH_STOPWORDS = {
+    # Palabras vacías del castellano.
     "a", "al", "algo", "algun", "alguna", "algunas", "alguno", "algunos",
     "ante", "antes", "asi", "aun", "aunque", "bajo", "bien", "cada", "casi",
     "como", "con", "contra", "cual", "cuales", "cualquier", "cuando", "cuanto",
-    "de", "del", "desde", "donde", "dos", "el", "ella", "ellas", "ello", "ellos",
-    "en", "entre", "era", "erais", "eran", "eras", "eres", "es", "esa", "esas",
-    "ese", "eso", "esos", "esta", "estaba", "estaban", "estado", "estais", "estamos",
-    "estan", "estar", "estas", "este", "esto", "estos", "fue", "fueron", "fui",
-    "fuimos", "ha", "habia", "han", "hasta", "hay", "incluso", "la", "las", "le",
-    "les", "lo", "los", "mas", "me", "mi", "mis", "mucho", "muy", "nada", "ni",
-    "no", "nos", "nosotras", "nosotros", "nuestra", "nuestras", "nuestro", "nuestros",
-    "o", "os", "otra", "otras", "otro", "otros", "para", "pero", "poco", "por",
-    "porque", "que", "quien", "quienes", "se", "sea", "segun", "ser", "si", "sin",
-    "sobre", "solo", "su", "sus", "tambien", "te", "tenia", "tiene", "todo", "todos",
-    "tras", "tu", "tus", "un", "una", "uno", "unos", "y", "ya",
-    "ano", "anos", "canarias", "canario", "canaria", "isla", "islas",
-    "hoy", "ayer", "manana", "europa", "press", "foto", "fotos", "video",
+    "de", "del", "desde", "donde", "dos", "durante", "el", "ella", "ellas",
+    "ello", "ellos", "en", "entre", "era", "erais", "eran", "eras", "eres",
+    "es", "esa", "esas", "ese", "eso", "esos", "esta", "estaba", "estaban",
+    "estado", "estais", "estamos", "estan", "estar", "estas", "este", "esto",
+    "estos", "fue", "fueron", "fui", "fuimos", "gran", "ha", "habia", "han",
+    "hasta", "hay", "incluso", "la", "las", "le", "les", "lo", "los", "mas",
+    "me", "mi", "mis", "mucho", "muy", "nada", "ni", "no", "nos", "nosotras",
+    "nosotros", "nuestra", "nuestras", "nuestro", "nuestros", "o", "os",
+    "otra", "otras", "otro", "otros", "para", "pero", "poco", "por", "porque",
+    "que", "quien", "quienes", "se", "sea", "segun", "ser", "si", "sin",
+    "sobre", "solo", "su", "sus", "tambien", "te", "tenia", "tiene", "todo",
+    "todos", "tras", "tu", "tus", "un", "una", "uno", "unos", "y", "ya",
+    # Ruido propio de este corpus: geografía omnipresente, marcas temporales,
+    # agencias y pies de foto. No aportan nada a una nube de prensa canaria.
+    "ano", "anos", "ayer", "canaria", "canarias", "canario", "europa", "foto",
+    "fotos", "hoy", "isla", "islas", "manana", "press", "video",
 }
 
 TOKEN_RE = re.compile(r"[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}")

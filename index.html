@@ -1081,7 +1081,7 @@ async function fetchWordcloudTerms(scopeKey) {
 function wcDesdeTitulares() {
   const data = filtNW();
   const allTitles = (data.length > 0 ? data : NW).map(d => d.titulo).join(' ');
-  const stop = new Set(['de', 'la', 'el', 'en', 'a', 'y', 'que', 'los', 'las', 'por', 'con', 'del', 'se', 'un', 'una', 'al', 'es', 'para', 'no', 'su', 'más', 'como', 'ha', 'lo', 'le', 'si', 'son', 'sus', 'sobre', 'entre', 'pero', 'o', 'también', 'ya', 'este', 'esta', 'han', 'hay', 'ante', 'fue', 'ni', 'muy', 'hasta', 'desde', 'tras', 'sin', 'cuando', 'todo', 'hace', 'puede', 'les', 'esto', 'cada', 'todos', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nuevo', 'nueva', 'gran', 'estos', 'estas', 'ser', 'sido', 'has', 'tienen', 'sera', 'será', 'año', 'años']);
+  const stop = new Set(['de', 'la', 'el', 'en', 'a', 'y', 'que', 'los', 'las', 'por', 'con', 'del', 'se', 'un', 'una', 'al', 'es', 'para', 'no', 'su', 'más', 'como', 'ha', 'lo', 'le', 'si', 'son', 'sus', 'sobre', 'entre', 'pero', 'o', 'también', 'ya', 'durante', 'este', 'esta', 'han', 'hay', 'ante', 'fue', 'ni', 'muy', 'hasta', 'desde', 'tras', 'sin', 'cuando', 'todo', 'hace', 'puede', 'les', 'esto', 'cada', 'todos', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nuevo', 'nueva', 'gran', 'estos', 'estas', 'ser', 'sido', 'has', 'tienen', 'sera', 'será', 'año', 'años']);
   const freq = {};
   allTitles.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !stop.has(w)).forEach(w => { freq[w] = (freq[w] || 0) + 1 });
   return Object.entries(freq).map(([text, count]) => ({ text, peso: count, docs: count }))
