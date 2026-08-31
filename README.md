@@ -38,7 +38,16 @@ va mal, se ve en el log del job, no en el aspa roja.
 
 `index.html` es autónomo: obtiene los datos en el navegador desde la vista
 pública `v_noticias_medios` de Supabase (con la *anon* key) y calcula ahí mismo
-los agregados y la nube de palabras a partir de los titulares.
+los agregados de medio, tema y actividad horaria.
+
+La nube de palabras es la excepción: lee el agregado `medios.wordcloud_terms`
+(ver más abajo), que pondera el artículo completo en vez de solo el titular.
+`drawWC()` traduce los filtros de medio y tema al `scope_key` correspondiente,
+pide ese ámbito bajo demanda y lo cachea. El filtro de fechas no interviene,
+igual que antes: `filtNW()` nunca ha filtrado por fecha. Si el agregado no
+responde o no tiene filas para el ámbito activo, la tarjeta recurre al cálculo
+en cliente sobre los titulares y lo indica en su subtítulo, de modo que sigue
+mostrando algo aunque el pipeline se rompa.
 
 Por eso `generate_dashboard.py`, que inyectaba un bloque estático
 `const MM=[…] … const NW=[…];` en el HTML, ya no tiene nada que reescribir: ese
@@ -69,11 +78,11 @@ filas en 200 ámbitos sobre 12.664 noticias.
    `medios.wordcloud_terms` con RLS y lectura pública, su índice, la función
    `public.truncate_wordcloud_terms` restringida a `service_role`, y los grants
    de `service_role` sobre el esquema `medios`, que no existían.
-3. **Consumo desde el frontend** — *pendiente*. `index.html` no lee
-   `wordcloud_terms`: sigue calculando la nube en cliente a partir de los
-   titulares (`drawWC()`). Hasta que se conecte, la tabla se rellena sin que
-   nadie la use, así que conviene decidir si se completa la integración o se
-   retira el workflow.
+3. **Consumo desde el frontend** — conectado. `drawWC()` en `index.html` lee
+   `medios.wordcloud_terms` por REST con la *anon* key, que puede hacerlo
+   gracias a la política `lectura_publica_wordcloud_terms`. La tabla vive en el
+   esquema `medios`, así que la petición necesita la cabecera
+   `Accept-Profile: medios`; sin ella PostgREST responde 404 (PGRST205).
 
 Si falta alguno de los secrets, el workflow omite el paso de build y explica el
 motivo en el resumen del job, en lugar de fallar.
