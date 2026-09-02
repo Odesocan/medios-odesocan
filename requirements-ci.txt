@@ -3,6 +3,14 @@
 # dashboard.py (2026-03-24) solo contiene el cliente `supabase`, usado por
 # scripts/build_wordcloud_terms.py.
 # Última revisión: abril 2026 (comentario corregido en mantenimiento automático 2026-08-05)
+# Mantenimiento automático 2026-08-25: se retiraron scikit-learn, pandas y
+# wordcloud — no se importan en ningún script del repo (scraper.py,
+# clasificador.py, supabase_loader.py, generate_dashboard.py, scheduler.py,
+# config.py) ni son dependencias transitivas de ningún paquete listado aquí
+# (verificado con los metadatos de PyPI). nltk y Pillow SÍ se conservan:
+# aunque tampoco se importan directamente, son dependencias transitivas
+# reales de newspaper3k (nltk>=3.2.1, Pillow>=3.3.0 según su metadata),
+# usadas internamente para NLP y extracción de imagen de portada.
 
 # ── Scraping ──────────────────────────────────────────────────────────────────
 feedparser==6.0.11
@@ -16,12 +24,9 @@ psycopg2-binary==2.9.10
 
 # ── NLP ───────────────────────────────────────────────────────────────────────
 spacy==3.8.4
-scikit-learn==1.5.2
 nltk==3.9.1
 
 # ── Utilidades ────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
 schedule==1.2.2
-pandas==2.2.3
 Pillow==11.1.0
-wordcloud==1.9.4
