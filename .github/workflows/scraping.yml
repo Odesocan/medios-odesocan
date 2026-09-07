@@ -7,10 +7,18 @@ name: Scraping medios canarios
  
 on:
   schedule:
-    # Cada día a las 10:00 UTC (11:00 hora Canarias). GitHub encola los crons
-    # con retraso variable: la hora real de arranque oscila entre las 10:00 y
-    # las 20:00 UTC. Es comportamiento normal de la plataforma, no un fallo.
-    - cron: "0 10 * * *"
+    # Cuatro tiradas al día, cada seis horas. Una sola observación diaria no
+    # permite ver las piezas que aparecen y desaparecen de portada dentro del
+    # mismo ciclo, ni medir con finura cuánto aguanta cada una: con 24 horas de
+    # grano, la permanencia solo se cuenta en días enteros.
+    #
+    # El coste es contenido porque el scraper consulta a Supabase qué piezas ya
+    # están en el corpus y no vuelve a pedir su artículo: lo que se multiplica
+    # por cuatro es el listado de portada, una petición por cabecera.
+    #
+    # GitHub encola los crons con retraso variable, así que estas horas son
+    # orientativas. Es comportamiento de la plataforma, no un fallo.
+    - cron: "0 2,8,14,20 * * *"
   workflow_dispatch:   # Permite ejecución manual desde la UI de GitHub Actions
     inputs:
       medio:

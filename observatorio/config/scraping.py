@@ -21,11 +21,12 @@ SCRAPER = {
     "max_listado_por_medio": 0,
     # Tope de descargas de TEXTO COMPLETO por medio y ejecución. Esto sí cuesta
     # una petición por pieza, así que es aquí donde tiene sentido limitar.
-    # 20 por cabecera y ejecución. El presupuesto solo lo gastan las piezas
-    # NUEVAS y CON TEMA, así que en un día normal apenas se agota. El número
-    # sale del tiempo: cada descarga cuesta ~6 s con las pausas de cortesía,
-    # así que 17 cabeceras × 20 ≈ 34 min, dentro del timeout del workflow.
-    "max_articulos_por_medio": 20,
+    # 15 por cabecera y TIRADA, con cuatro tiradas al día. El presupuesto solo
+    # lo gastan las piezas nuevas y con tema —las que ya están en el corpus se
+    # saltan—, así que en las tiradas de la tarde apenas se toca. Cada descarga
+    # cuesta unos 6 s con las pausas de cortesía: 17 cabeceras × 15 ≈ 25 min en
+    # el peor caso, holgado dentro del timeout del workflow.
+    "max_articulos_por_medio": 15,
     # Días que se conserva el caché HTML
     "cache_ttl_dias": 7,
     # robots.txt desactivado: monitoreo académico con 1 ejecución/día,

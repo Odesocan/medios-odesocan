@@ -4,6 +4,8 @@
 -- `wordcloud_truncate_revocar_anon_authenticated`).
 
 create table if not exists medios.wordcloud_terms (
+  -- '__all__' para el acumulado, 'AAAA-MM' para el corte mensual
+  periodo text not null default '__all__',
   scope_key text not null,
   medio text,
   tema text,
@@ -16,11 +18,41 @@ create table if not exists medios.wordcloud_terms (
   sample_titles jsonb not null default '[]'::jsonb,
   n_noticias integer not null,
   generated_at timestamptz not null default now(),
-  primary key (scope_key, gram_type, normalized_term)
+  primary key (periodo, scope_key, gram_type, normalized_term)
 );
 
 create index if not exists wordcloud_terms_score_idx
   on medios.wordcloud_terms (medio, tema, score desc);
+
+-- ── Corte temporal ────────────────────────────────────────────────────────
+-- Sobre una tabla ya creada sin la columna. El agregado se truncaba y se
+-- reconstruía sobre el corpus entero en cada ejecución, así que solo respondía
+-- a «qué palabras dominan el archivo completo» y no servía para ninguna serie
+-- temporal de atributos. Ahora se guarda el acumulado ('__all__') y un corte
+-- por mes, y el periodo entra en la clave primaria.
+alter table medios.wordcloud_terms
+  add column if not exists periodo text not null default '__all__';
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'medios.wordcloud_terms'::regclass
+      and conname  = 'wordcloud_terms_pkey'
+      and pg_get_constraintdef(oid) = 'PRIMARY KEY (scope_key, gram_type, normalized_term)'
+  ) then
+    alter table medios.wordcloud_terms drop constraint wordcloud_terms_pkey;
+    alter table medios.wordcloud_terms add constraint wordcloud_terms_pkey
+      primary key (periodo, scope_key, gram_type, normalized_term);
+  end if;
+end
+$$;
+
+create index if not exists wordcloud_terms_periodo_idx
+  on medios.wordcloud_terms (periodo, medio, tema, score desc);
+
+comment on column medios.wordcloud_terms.periodo is
+'__all__ = corpus acumulado (lo que consume el dashboard). AAAA-MM = corte mensual, para series temporales de atributos. Derivado de fecha_scrap.';
 
 comment on table medios.wordcloud_terms is
 'Agregado textual para la word cloud del observatorio de medios.';

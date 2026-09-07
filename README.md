@@ -23,8 +23,8 @@ diferencia se perdía: el scraper saltaba lo que ya había visto.
 
 | Workflow | Fichero | Cadencia | Estado |
 |---|---|---|---|
-| Scraping medios canarios | `.github/workflows/scraping.yml` | diaria, 10:00 UTC | operativo |
-| Build Wordcloud Terms | `.github/workflows/build-wordcloud.yml` | diaria, 12:00 UTC | operativo |
+| Scraping medios canarios | `.github/workflows/scraping.yml` | cada 6 h (02, 08, 14, 20 UTC) | operativo |
+| Build Wordcloud Terms | `.github/workflows/build-wordcloud.yml` | diaria, 23:00 UTC | operativo |
 
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
 puede desplazarse varias horas respecto al cron. Es comportamiento de la
@@ -130,7 +130,7 @@ Variables opcionales (como *repository variables*, con estos valores por
 defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
 (`noticias`), `SUPABASE_TARGET_SCHEMA` (`medios`), `SUPABASE_TARGET_TABLE`
 (`wordcloud_terms`), `WORDCLOUD_MAX_TERMS` (`80`), `WORDCLOUD_MIN_DOC_FREQ`
-(`2`).
+(`2`), `WORDCLOUD_MESES` (`12`).
 
 ## Estructura del repositorio
 

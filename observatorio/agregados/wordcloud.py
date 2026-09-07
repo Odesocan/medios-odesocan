@@ -25,6 +25,18 @@ Destino:
   - medio
   - tema
   - medio + tema
+
+y, cruzado con lo anterior, por PERIODO: el conjunto acumulado (`__all__`) y un
+corte por mes. Sin el corte, el agregado se truncaba y se reconstruía sobre todo
+el corpus en cada ejecución, así que solo respondía a «qué palabras dominan el
+archivo entero» y no servía para ninguna serie temporal de atributos. La columna
+`generated_at` es la marca de construcción, no un periodo, y se confundía con
+facilidad.
+
+El periodo se deriva de `fecha_scrap` y no de `fecha_pub`: está siempre presente
+y es uniforme para todas las cabeceras, mientras que `fecha_pub` tiene
+procedencias distintas. Al agregar por mes la diferencia entre ambas es
+despreciable, porque las piezas se raspan el mismo día que aparecen en portada.
 """
 
 from __future__ import annotations
@@ -49,6 +61,10 @@ TARGET_SCHEMA = os.getenv("SUPABASE_TARGET_SCHEMA", "medios")
 TARGET_TABLE = os.getenv("SUPABASE_TARGET_TABLE", "wordcloud_terms")
 
 MAX_TERMS_PER_SCOPE = int(os.getenv("WORDCLOUD_MAX_TERMS", "80"))
+# Cuántos meses recientes se cortan, además del acumulado. Acotado para que la
+# tabla no crezca sin límite: 12 meses cubren una serie anual completa.
+MESES_A_CORTAR = int(os.getenv("WORDCLOUD_MESES", "12"))
+PERIODO_ACUMULADO = "__all__"
 MIN_DOC_FREQ = int(os.getenv("WORDCLOUD_MIN_DOC_FREQ", "2"))
 BATCH_SIZE = int(os.getenv("SUPABASE_BATCH_SIZE", "1000"))
 UPSERT_CHUNK_SIZE = int(os.getenv("WORDCLOUD_UPSERT_CHUNK_SIZE", "500"))
@@ -60,6 +76,7 @@ SOURCE_COLUMNS = [
     "titulo",
     "resumen",
     "texto_full",
+    "fecha_scrap",
 ]
 
 FIELD_WEIGHTS = {
@@ -102,6 +119,15 @@ class NewsItem:
     titulo: str
     resumen: str
     texto_full: str
+    periodo: str = ""      # "AAAA-MM" derivado de fecha_scrap
+
+
+def periodo_de(fecha: object) -> str:
+    """Mes de la pieza en formato AAAA-MM, o cadena vacía si no se puede."""
+    if not fecha or not isinstance(fecha, str) or len(fecha) < 7:
+        return ""
+    anio, mes = fecha[:4], fecha[5:7]
+    return f"{anio}-{mes}" if anio.isdigit() and mes.isdigit() else ""
 
 
 def env_required(name: str) -> str:
@@ -229,6 +255,7 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
                     titulo=str(row.get("titulo") or "").strip(),
                     resumen=str(row.get("resumen") or "").strip(),
                     texto_full=str(row.get("texto_full") or "").strip(),
+                    periodo=periodo_de(row.get("fecha_scrap")),
                 )
             )
         if len(batch) < BATCH_SIZE:
@@ -272,7 +299,10 @@ def make_scope_key(medio: str | None, tema: str | None) -> str:
     return f"medio:{medio}|tema:{tema}"
 
 
-def build_aggregates(news_items: Sequence[NewsItem]) -> List[Dict[str, object]]:
+def build_aggregates(
+    news_items: Sequence[NewsItem],
+    periodo: str = PERIODO_ACUMULADO,
+) -> List[Dict[str, object]]:
     generated_at = datetime.now(timezone.utc).isoformat()
     scope_tf: Dict[Tuple[str | None, str | None], Counter] = defaultdict(Counter)
     scope_df: Dict[Tuple[str | None, str | None], Dict[str, set]] = defaultdict(lambda: defaultdict(set))
@@ -312,6 +342,7 @@ def build_aggregates(news_items: Sequence[NewsItem]) -> List[Dict[str, object]]:
             score = round(term_freq * math.log(1 + (total_docs / max(doc_freq, 1))), 4)
             ranked_rows.append(
                 {
+                    "periodo": periodo,
                     "scope_key": make_scope_key(medio, tema),
                     "medio": medio,
                     "tema": tema,
@@ -362,7 +393,7 @@ def upsert_rows(client: Client, rows: Sequence[Dict[str, object]]) -> None:
             .table(TARGET_TABLE)
             .upsert(
                 list(batch),
-                on_conflict="scope_key,gram_type,normalized_term",
+                on_conflict="periodo,scope_key,gram_type,normalized_term",
             )
             .execute()
         )
@@ -375,7 +406,18 @@ def main() -> int:
         print("No se recuperaron noticias desde Supabase.", file=sys.stderr)
         return 1
 
-    aggregates = build_aggregates(news_items)
+    # Acumulado, que es lo que consume el dashboard…
+    aggregates = build_aggregates(news_items, PERIODO_ACUMULADO)
+
+    # …y un corte por mes, que es lo que permite una serie temporal.
+    por_mes: Dict[str, List[NewsItem]] = defaultdict(list)
+    for item in news_items:
+        if item.periodo:
+            por_mes[item.periodo].append(item)
+    meses = sorted(por_mes, reverse=True)[:MESES_A_CORTAR]
+    for mes in meses:
+        aggregates.extend(build_aggregates(por_mes[mes], mes))
+
     if not aggregates:
         print("No se generaron agregados de términos.", file=sys.stderr)
         return 1
@@ -384,6 +426,7 @@ def main() -> int:
     upsert_rows(client, aggregates)
     print(
         f"Word cloud generada: {len(news_items)} noticias procesadas, "
-        f"{len(aggregates)} filas agregadas."
+        f"{len(aggregates)} filas agregadas "
+        f"({len(meses)} meses + acumulado)."
     )
     return 0

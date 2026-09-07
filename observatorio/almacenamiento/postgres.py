@@ -59,6 +59,33 @@ def conectar_supabase() -> psycopg2.extensions.connection:
 
 # ── Sincronización ────────────────────────────────────────────────────────────
 
+def hashes_conocidos() -> set[str]:
+    """
+    `url_hash` que ya están en Supabase, para no repetir trabajo entre tiradas.
+
+    Hace falta porque en GitHub Actions la SQLite arranca vacía en cada
+    ejecución: `ya_existe()` mira la base local y siempre dice que no, de modo
+    que con varias tiradas al día se volvería a descargar el artículo completo
+    de piezas que ya están en el corpus. Con una sola tirada diaria daba igual;
+    con cuatro, multiplica por cuatro las peticiones a los medios.
+
+    Si Supabase no está disponible devuelve un conjunto vacío, que es el
+    comportamiento de siempre: se pierde eficiencia, no corrección.
+    """
+    try:
+        pg = conectar_supabase()
+    except Exception as e:
+        log.warning("No se pudieron leer los hashes conocidos (%s); se sigue sin ellos", e)
+        return set()
+    try:
+        return _hashes_en_supabase(pg)
+    except Exception as e:
+        log.warning("Error leyendo los hashes conocidos: %s", e)
+        return set()
+    finally:
+        pg.close()
+
+
 def _hashes_en_supabase(pg: psycopg2.extensions.connection) -> set[str]:
     """Devuelve el conjunto de url_hash ya presentes en Supabase."""
     schema = SUPABASE["schema"]

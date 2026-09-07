@@ -15,10 +15,10 @@ name: Build Wordcloud Terms
 on:
   workflow_dispatch:
   schedule:
-    # Una vez al día, después del scraping diario ("Scraping medios canarios",
-    # 10:00 UTC + ~15 min de ejecución). Antes era "15 * * * *" (cada hora):
-    # 24 ejecuciones diarias para una fuente que solo cambia una vez al día.
-    - cron: "0 12 * * *"
+    # Una vez al día, después de la última tirada de scraping (20:00 UTC).
+    # El agregado se reconstruye entero en cada ejecución, así que no gana nada
+    # con correr más veces: basta con que corra cuando el día está completo.
+    - cron: "0 23 * * *"
 
 jobs:
   build-wordcloud:
@@ -92,4 +92,5 @@ jobs:
           SUPABASE_TARGET_TABLE: ${{ vars.SUPABASE_TARGET_TABLE || 'wordcloud_terms' }}
           WORDCLOUD_MAX_TERMS: ${{ vars.WORDCLOUD_MAX_TERMS || '80' }}
           WORDCLOUD_MIN_DOC_FREQ: ${{ vars.WORDCLOUD_MIN_DOC_FREQ || '2' }}
+          WORDCLOUD_MESES: ${{ vars.WORDCLOUD_MESES || '12' }}
         run: python bin/construir_wordcloud.py

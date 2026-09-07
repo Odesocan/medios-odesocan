@@ -33,6 +33,7 @@ from observatorio.almacenamiento.sqlite import (
 )
 from observatorio.clasificacion.motor import clasificar
 from observatorio.comun.registro import configurar_logging
+from observatorio.comun.texto import url_hash
 from observatorio.config.medios import MEDIOS
 from observatorio.config.scraping import SCRAPER
 from observatorio.recoleccion import fechas
@@ -63,6 +64,7 @@ def scrapear_medio(
     dry_run: bool = False,
     extraer_articulos: bool = False,
     run_id: Optional[str] = None,
+    conocidas: Optional[set] = None,
 ) -> dict:
     """
     Scraping completo de un medio: RSS → HTML → (opcional) texto completo.
@@ -148,6 +150,7 @@ def scrapear_medio(
         log.info("  Total noticias únicas: %d", stats["total"])
 
         observado_en = datetime.now(timezone.utc).isoformat()
+        conocidas_set = conocidas if conocidas is not None else set()
 
         for n in noticias_unicas:
             if dry_run:
@@ -160,7 +163,10 @@ def scrapear_medio(
             if registrar_observacion(conn, n, run_id, observado_en):
                 stats["observadas"] += 1
 
-            if ya_existe(conn, n["url"]):
+            # `conocidas` son los url_hash ya presentes en Supabase. Sin ellos,
+            # en CI la base local está vacía y cada tirada del día volvería a
+            # descargar el artículo de piezas que ya están en el corpus.
+            if ya_existe(conn, n["url"]) or url_hash(n["url"]) in conocidas_set:
                 continue
 
             temas = clasificar(
@@ -234,13 +240,27 @@ def scrapear_todos(
     dry_run: bool = False,
     extraer_articulos: bool = False,
     medios: Optional[list[str]] = None,
+    usar_conocidas: bool = True,
 ) -> list[dict]:
-    """Ejecuta el scraping para todos los medios (o los indicados)."""
+    """
+    Ejecuta el scraping para todos los medios (o los indicados).
+
+    `usar_conocidas` consulta a Supabase qué piezas ya están en el corpus para
+    no volver a descargar sus artículos. Es lo que hace viable ejecutar varias
+    veces al día sin multiplicar las peticiones a los medios.
+    """
     configurar_logging("scraper")
     conn = init_db()
     cliente = ClienteHTTP()
     medios_a_scrapear = medios or list(MEDIOS.keys())
     run_id = nuevo_run_id()
+
+    conocidas: set = set()
+    if usar_conocidas and extraer_articulos:
+        from observatorio.almacenamiento.postgres import hashes_conocidos
+        conocidas = hashes_conocidos()
+        log.info("Piezas ya en el corpus: %d (no se les volverá a pedir el artículo)",
+                 len(conocidas))
     resultados = []
     inicio_total = time.time()
 
@@ -258,6 +278,7 @@ def scrapear_todos(
                     dry_run=dry_run,
                     extraer_articulos=extraer_articulos,
                     run_id=run_id,
+                    conocidas=conocidas,
                 )
                 resultados.append(stats)
             except Exception as e:

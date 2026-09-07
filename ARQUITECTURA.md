@@ -424,9 +424,17 @@ viaja siempre acompañada de `fuente`.
 | `truncate_wordcloud_terms()` | `public` | ✅ `db/wordcloud.sql` | — | solo *service_role* |
 
 **`medios.wordcloud_terms`** — clave primaria compuesta
-`(scope_key, gram_type, normalized_term)`; columnas `medio`, `tema`, `term`,
-`score`, `doc_freq`, `term_freq`, `sample_titles` (jsonb, hasta 3 titulares de
-ejemplo), `n_noticias`, `generated_at`.
+`(periodo, scope_key, gram_type, normalized_term)`; columnas `medio`, `tema`,
+`term`, `score`, `doc_freq`, `term_freq`, `sample_titles` (jsonb, hasta 3
+titulares de ejemplo), `n_noticias`, `generated_at`.
+
+`periodo` vale `__all__` para el corpus acumulado —lo que consume el
+dashboard— o `AAAA-MM` para el corte mensual, que es lo que permite una serie
+temporal de atributos. Antes el agregado se truncaba y se reconstruía sobre todo
+el corpus en cada ejecución, así que solo respondía a «qué palabras dominan el
+archivo entero»; `generated_at` es la marca de construcción y se confundía con
+un periodo. El mes se deriva de `fecha_scrap`, que está siempre presente y es
+uniforme, no de `fecha_pub`, que tiene procedencias distintas.
 
 **Cuatro ámbitos precalculados** (`wordcloud.scope_keys`):
 
@@ -521,7 +529,7 @@ perder cobertura frente a algún falso positivo.
 
 `delay_min` 1,5 s · `delay_max` 5,0 s · `pausa_larga_prob` 0,12 ·
 `pausa_larga_rango` (8, 22) s · `timeout` 15 s · `max_reintentos` 3 ·
-`max_listado_por_medio` **0 (sin tope)** · `max_articulos_por_medio` 20 ·
+`max_listado_por_medio` **0 (sin tope)** · `max_articulos_por_medio` 15 (por tirada, con cuatro al día) ·
 `cache_ttl_dias` 7 · `respetar_robots` **False**.
 
 El `Accept-Encoding` que anuncia el cliente se construye con los descompresores
@@ -539,8 +547,8 @@ EFE Canarias sin extraer una sola pieza.
 
 | Workflow | Cron (UTC) | Ejecuta | Dependencias |
 |---|---|---|---|
-| `scraping.yml` | `0 10 * * *` | `python bin/scraping.py --run-now` | `requirements/pipeline.txt` + Playwright + `es_core_news_md` |
-| `build-wordcloud.yml` | `0 12 * * *` | `python bin/construir_wordcloud.py` | `requirements/wordcloud.txt` (solo `supabase`) |
+| `scraping.yml` | `0 2,8,14,20 * * *` | `python bin/scraping.py --run-now` | `requirements/pipeline.txt` + Playwright + `es_core_news_md` |
+| `build-wordcloud.yml` | `0 23 * * *` | `python bin/construir_wordcloud.py` | `requirements/wordcloud.txt` (solo `supabase`) |
 | `reclasificar.yml` | solo a mano | `python bin/reclasificar.py` | igual que el scraping, **incluido el modelo de spaCy** |
 
 `reclasificar.yml` existe precisamente por el modelo: la huella del clasificador
@@ -549,8 +557,21 @@ distinto. Ejecutar la reclasificación en una máquina sin `es_core_news_md`
 sellaría el corpus con una huella que no es la de producción, que es justo el
 problema que la columna viene a resolver. Por defecto se dispara en seco.
 
+El scraping corre **cuatro veces al día**, cada seis horas. Con una sola
+observación diaria no se veían las piezas que aparecen y desaparecen de portada
+dentro del mismo ciclo, y la permanencia solo podía contarse en días enteros.
+
+Lo que se multiplica por cuatro es el listado de portada, que cuesta una
+petición por cabecera. Los artículos no: antes de empezar, el scraper consulta a
+Supabase qué `url_hash` ya están en el corpus (`postgres.hashes_conocidos`) y se
+salta esas piezas. Sin esa consulta la cuadruplicación sería real, porque en CI
+la SQLite arranca vacía en cada tirada y `ya_existe()` siempre diría que no.
+
+El agregado de la nube corre una vez, a las 23:00, cuando el día está completo:
+se reconstruye entero en cada ejecución, así que no gana nada con correr más.
+
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
-puede desplazarse horas. Está documentado en ambos ficheros y en el README como
+puede desplazarse horas. Está documentado en los ficheros y en el README como
 comportamiento de plataforma, no como fallo.
 
 ### 7.2 Secrets y variables
@@ -622,6 +643,7 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 | Cambiar cuántos artículos se descargan al día | `max_articulos_por_medio` en `config/scraping.py` |
 | Añadir un medio con portada inservible pero WordPress | `tipo: "wp_json"` + `wp_api` en `config/medios.py` |
 | Cambiar la cadencia del scraping | `.github/workflows/scraping.yml` → `cron` (y `bin/scraping.py` para el modo daemon) |
+| Cambiar cuántos meses guarda la nube | variable de repositorio `WORDCLOUD_MESES` (por defecto 12) |
 | Limpiar palabras vacías de la nube | `SPANISH_STOPWORDS` en `observatorio/agregados/wordcloud.py` |
 | Cambiar cuántos términos guarda la nube | variable de repositorio `WORDCLOUD_MAX_TERMS` |
 | Modificar un gráfico | la función `drawX()` correspondiente en `index.html` (tabla del §4.4) |
@@ -647,9 +669,12 @@ Ninguno impide que el sistema funcione hoy.
 2. **El corpus crece mucho más rápido que antes.** Al quitar el recorte del
    listado y conservar las piezas sin tema, una cabecera grande pasa de ~30
    filas por ejecución a más de 100. Con 17 cabeceras son del orden de 1.500
-   filas diarias, frente a las 12.664 acumuladas en toda la vida anterior del
-   proyecto. Hay que vigilar la cuota de almacenamiento de Supabase y decidir
-   una política de retención para `texto_full`, que es lo que ocupa.
+   filas diarias de `noticias`, más las `observaciones`, que con cuatro tiradas
+   al día multiplican por cuatro las filas por pieza mientras siga en portada.
+   Y la nube pasa de ~14.000 filas a un orden de magnitud más al guardar doce
+   meses. Hay que vigilar la cuota de almacenamiento de Supabase y decidir una
+   política de retención para `texto_full` y para los meses antiguos del
+   agregado.
 
 3. **`index.html` descarga el corpus entero al navegador** en páginas de 1.000
    filas. La vista ya filtra las piezas sin tema, así que el dashboard no crece

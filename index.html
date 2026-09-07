@@ -1065,6 +1065,9 @@ async function fetchWordcloudTerms(scopeKey) {
   const url = SUPABASE_URL + '/rest/v1/wordcloud_terms'
     + '?select=term,score,doc_freq'
     + '&scope_key=eq.' + encodeURIComponent(scopeKey)
+    // La tabla guarda además un corte mensual; el dashboard muestra el
+    // acumulado. Sin este filtro se sumarían las filas de todos los meses.
+    + '&periodo=eq.__all__'
     + '&order=score.desc&limit=55';
   const res = await fetch(url, {
     headers: {
