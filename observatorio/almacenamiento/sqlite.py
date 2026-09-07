@@ -43,7 +43,8 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
             raw_json    TEXT,               -- payload original del feed
             temas       TEXT,               -- JSON array de temas clasificados
             seccion     TEXT,               -- sección propia del medio (feed o URL)
-            clasificador_version TEXT       -- huella del clasificador que la etiquetó
+            clasificador_version TEXT,      -- huella del clasificador que la etiquetó
+            fecha_pub_origen TEXT           -- de dónde salió fecha_pub: feed|api|jsonld|meta|url|sintetica
         );
 
         -- Una fila por pieza VISTA en cada ejecución, exista ya o no.
@@ -84,7 +85,7 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """)
     # Migración: añadir columnas nuevas si la BD ya existía sin ellas
     for col, defn in [("temas", "TEXT"), ("texto_full", "TEXT"), ("seccion", "TEXT"),
-                      ("clasificador_version", "TEXT")]:
+                      ("clasificador_version", "TEXT"), ("fecha_pub_origen", "TEXT")]:
         try:
             conn.execute(f"ALTER TABLE noticias ADD COLUMN {col} {defn}")
             conn.commit()
@@ -127,8 +128,8 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
             """INSERT INTO noticias
                (url, url_hash, medio, titulo, resumen, texto_full,
                 fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
-                clasificador_version)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                clasificador_version, fecha_pub_origen)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 noticia["url"], h, noticia["medio"],
                 noticia["titulo"], noticia.get("resumen"),
@@ -139,6 +140,7 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
                 json.dumps(temas, ensure_ascii=False),
                 noticia.get("seccion"),
                 noticia.get("clasificador_version") or version_clasificador(),
+                noticia.get("fecha_pub_origen"),
             ),
         )
         conn.commit()

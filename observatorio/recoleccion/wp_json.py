@@ -17,6 +17,7 @@ import re
 from typing import Optional
 
 from observatorio.config.scraping import SCRAPER
+from observatorio.recoleccion import fechas
 from observatorio.recoleccion.clientes import ClienteHTTP
 
 log = logging.getLogger("scraper")
@@ -103,7 +104,9 @@ def parsear_wp_json(
             "seccion": "/".join(secciones[:2]) or None,
             "resumen": _texto((post.get("excerpt") or {}).get("rendered"))[:800],
             # Fecha de publicación REAL, no la hora del raspado.
-            "fecha_pub": post.get("date"),
+            "fecha_pub": fechas.parsear_fecha(post.get("date")) or fechas.ahora(),
+            "fecha_pub_origen": (fechas.API if fechas.parsear_fecha(post.get("date"))
+                                 else fechas.SINTETICA),
             "fuente": "wp_json",
             "raw": {
                 "origen": "wp-json",

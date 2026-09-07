@@ -41,6 +41,12 @@ plataforma, no un fallo del repositorio.
 2. `observatorio/clasificacion/` — asigna temas. Las piezas sin tema **se
    conservan** con `temas` vacío: son el denominador de cualquier medida de
    saliencia. Lo que no se hace es descargarles el cuerpo del artículo.
+
+   Cada pieza se sella con la versión del clasificador que la etiquetó
+   (`clasificador_version`) y con la procedencia de su fecha de publicación
+   (`fecha_pub_origen`). Sin lo primero una serie temporal confunde el cambio de
+   agenda con el cambio del instrumento; sin lo segundo no se distingue una
+   fecha real de la hora del raspado.
 3. `observatorio/almacenamiento/postgres.py` — sincroniza lo nuevo contra
    `medios.noticias` y vuelca `medios.observaciones`, por conexión Postgres
    directa (`psycopg2`).

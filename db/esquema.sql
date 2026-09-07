@@ -10,6 +10,7 @@
 --      laguna de reproducibilidad de tener el esquema solo dentro de Supabase.
 --   2.  Añade la columna `seccion` a `medios.noticias`.       ← SÍ cambia la base
 --   2b. Añade `clasificador_version` a `medios.noticias`.     ← SÍ cambia la base
+--   2c. Añade `fecha_pub_origen` a `medios.noticias`.         ← SÍ cambia la base
 --   3.  Crea `medios.observaciones`.                          ← SÍ cambia la base
 --   4.  Rehace la vista pública con el filtro temático.       ← SÍ cambia la base
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -34,7 +35,8 @@ create table if not exists medios.noticias (
   entidades   jsonb,
   temas       text[],
   seccion     text,
-  clasificador_version text
+  clasificador_version text,
+  fecha_pub_origen text
 );
 
 create table if not exists medios.scraping_log (
@@ -79,6 +81,33 @@ create index if not exists noticias_clasificador_version_idx
 
 comment on column medios.noticias.clasificador_version is
 'Huella del clasificador que etiquetó la pieza. NULL = anterior a esta columna. Dos piezas con huellas distintas NO son comparables en una serie temporal.';
+
+-- ── 2c. Procedencia de la fecha de publicación ────────────────────────────
+-- Las piezas que entran por portada recibían `datetime.now()` del momento del
+-- raspado, así que para esas cabeceras cualquier serie temporal medía cuándo se
+-- ejecutó el scraper, no cuándo publicó el medio. Ahora la fecha se busca en la
+-- ruta de la URL, en el JSON-LD del artículo y en las etiquetas <meta>.
+--
+-- Guardar la fecha sin su procedencia no bastaría: el analista no podría
+-- distinguir una fecha real de la hora del raspado. Valores posibles:
+--
+--   feed           · pubDate del RSS                     (hora exacta)
+--   api            · campo `date` de la API de WordPress (hora exacta)
+--   jsonld         · datePublished del artículo          (hora exacta)
+--   meta           · <meta article:published_time>       (hora exacta)
+--   jsonld_portada · datePublished visto en la portada   (hora exacta)
+--   url            · fecha embebida en la ruta           (PRECISIÓN DE DÍA)
+--   sintetica      · hora del raspado. NO es fecha de publicación.
+--
+-- Regla para el análisis: filtrar por `fecha_pub_origen <> 'sintetica'`, y si
+-- se ordena dentro de una jornada, excluir además 'url'.
+alter table medios.noticias add column if not exists fecha_pub_origen text;
+
+create index if not exists noticias_fecha_pub_origen_idx
+  on medios.noticias (fecha_pub_origen);
+
+comment on column medios.noticias.fecha_pub_origen is
+'De donde salio fecha_pub. sintetica = hora del raspado, NO es fecha de publicacion. url = precision de dia. NULL = anterior a esta columna.';
 
 -- El denominador vive aquí: a partir de ahora `temas` puede ser un array vacío
 -- (pieza vista y clasificada, pero fuera de la agenda temática de ODESOCAN).
@@ -179,6 +208,8 @@ grant select on public.v_noticias_medios to anon, authenticated;
 --   select count(*) from public.v_noticias_medios;                -- = piezas con tema
 --   select clasificador_version, count(*) from medios.noticias
 --    group by 1 order by 2 desc;                                   -- versiones en el corpus
+--   select fecha_pub_origen, count(*) from medios.noticias
+--    group by 1 order by 2 desc;                                   -- fiabilidad temporal
 --
 -- Al aplicarlo, la vista pasará de 13.428 filas a 13.235: las 193 piezas que ya
 -- estaban sin tema dejan de contarse como noticias en el dashboard.

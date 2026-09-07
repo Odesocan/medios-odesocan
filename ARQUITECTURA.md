@@ -83,7 +83,8 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `rss.py` | `parsear_rss()`, `_normalizar_fecha()`. |
 | `wp_json.py` | `parsear_wp_json()`: API REST de WordPress, para medios cuya portada mezcla noticias con programación. |
 | `portada.py` | `parsear_html_portada()`, `_extraer_desde_jsonld_portada()`, `_url_html_permitida()`. |
-| `articulo.py` | `extraer_texto_articulo()`, `_article_body_desde_jsonld()`. |
+| `articulo.py` | `extraer_articulo()`: texto y fecha de publicación de una sola descarga. |
+| `fechas.py` | `fecha_desde_url()`, `fecha_desde_html()`, `mejor_que()`: la fecha real y su procedencia. |
 | `orquestador.py` | `scrapear_medio()`, `scrapear_todos()`. |
 | **`clasificacion/`** | |
 | `pistas.py` | `EXTRA_THEME_HINTS` (lenguaje periodístico), `URL_THEME_HINTS` (secciones). |
@@ -226,10 +227,12 @@ Estrategia en cascada, de más fiable a más frágil:
    seguridad: si los selectores CSS devuelven menos de la mitad de la cuota, se
    buscan bloques `ItemList` / `NewsArticle` en los datos estructurados. Esto es
    lo que salva al scraper cuando un medio cambia de plantilla.
-4. **Texto completo** (`articulo.extraer_texto_articulo`) — `articleBody` de
-   JSON-LD → `newspaper3k` → heurística con BeautifulSoup. Solo se descarga
-   **después** de que la noticia haya pasado el filtro temático, para no gastar
-   peticiones en artículos que se van a descartar.
+4. **Texto completo y fecha real** (`articulo.extraer_articulo`) — de una sola
+   descarga saca el cuerpo (`articleBody` de JSON-LD → `newspaper3k` →
+   heurística con BeautifulSoup) y la fecha de publicación (`datePublished` →
+   `<meta article:published_time>`). Solo se descarga **después** de que la
+   noticia haya pasado el filtro temático, para no gastar peticiones en
+   artículos que se van a descartar.
 
 **Dos clientes HTTP intercambiables por duck-typing** (ambos exponen `.get(url)`),
 en `clientes.py`:
@@ -386,6 +389,7 @@ en local.
 | `raw_json` | TEXT | payload original del feed o procedencia del extractor |
 | `temas` | TEXT | array JSON de claves de tema. **Vacío `[]` = pieza fuera de la agenda de ODESOCAN, conservada como denominador** |
 | `seccion` | TEXT | sección propia del medio (etiqueta del feed, categoría de la API o ruta de la URL) |
+| `fecha_pub_origen` | TEXT | de dónde salió `fecha_pub`: `feed`, `api`, `jsonld`, `meta`, `url` (día) o `sintetica` (hora del raspado) |
 | `clasificador_version` | TEXT | huella del clasificador que la etiquetó. **Piezas con huellas distintas no son comparables en una serie temporal** |
 
 Índices sobre `medio`, `fecha_pub`, `url_hash`. `PRAGMA journal_mode=WAL`.
@@ -624,6 +628,7 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 | Cambiar la paleta | `MEDIO_COLORS` / `TEMA_COLORS` en `index.html` **y** `config/medios.py` (están duplicadas) |
 | Añadir una columna a la nube | `db/wordcloud.sql` + `wordcloud.build_aggregates()` + `fetchWordcloudTerms()` |
 | Cambiar dónde se guardan datos y logs | `observatorio/config/rutas.py` |
+| Añadir un patrón de fecha en URL de un medio nuevo | `_PATRONES_URL` en `observatorio/recoleccion/fechas.py` |
 
 ---
 
@@ -632,13 +637,12 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 Hallazgos de la lectura, ordenados por lo que más afecta a un uso analítico.
 Ninguno impide que el sistema funcione hoy.
 
-1. **`fecha_pub` no es comparable entre fuentes.** En RSS y en la API de RTVC
-   viene de la fuente; en el raspado de portada se rellena con `datetime.now()`
-   del momento de la captura. Como el dashboard construye el gráfico de
-   actividad horaria sobre `fecha_pub`, para las cabeceras sin feed ese gráfico
-   mide **cuándo se ejecutó el scraper**, no cuándo publicó el medio. Cualquier
-   análisis temporal debe restringirse a `fuente IN ('rss','wp_json')` o usar
-   `fecha_scrap`. Es lo que queda por resolver del cambio R4 del cuaderno.
+1. **La fecha de portada de Canarias7 depende de que se descargue el artículo.**
+   Sus URLs no llevan fecha en la ruta, así que la pieza entra con marca
+   sintética y solo se corrige si el artículo se descarga —lo que ocurre para
+   las piezas con tema y dentro del presupuesto—. Las piezas del denominador de
+   esa cabecera se quedan, por tanto, con la hora del raspado. Se distingue con
+   `fecha_pub_origen`, que es justo para lo que está.
 
 2. **El corpus crece mucho más rápido que antes.** Al quitar el recorte del
    listado y conservar las piezas sin tema, una cabecera grande pasa de ~30
@@ -707,6 +711,13 @@ Se dejan anotadas porque el cuaderno metodológico las cita:
 - **El `</body></html>` duplicado** al final de `index.html`.
 - **La compresión brotli anunciada sin soporte**, que dejaba a EFE Canarias sin
   extraer una sola pieza y envenenaba la caché con binario.
+- **La fecha de publicación sintética.** Se busca en la ruta de la URL, en el
+  JSON-LD del artículo y en las etiquetas `<meta>`, y se guarda junto a su
+  procedencia. La Provincia, El Día y EFE pasan de 0 % a 100 % de fechas reales;
+  Canarias7 cubre por feed el 70 % y el resto por artículo.
+- **La deriva del clasificador.** La columna `clasificador_version` sella con
+  qué versión se etiquetó cada pieza, y `bin/reclasificar.py` reetiqueta el
+  corpus. Queda ejecutarlo sobre el histórico.
 
 ## 10. Glosario de orientación desde R
 

@@ -1,12 +1,14 @@
 """
-Extracción del texto completo de un artículo.
+Extracción del contenido de un artículo: texto y fecha de publicación real.
 
 Tres intentos en cascada: `articleBody` del JSON-LD, `newspaper3k`, y por
 último una heurística de párrafos con BeautifulSoup. Se trunca a 5.000
 caracteres.
 
 Solo se llama DESPUÉS de que la noticia haya pasado el filtro temático, para no
-gastar peticiones en artículos que se van a descartar.
+gastar peticiones en artículos que se van a descartar. Por eso el texto y la
+fecha se sacan de una única descarga: son los dos datos que solo están en la
+página del artículo.
 """
 
 import json
@@ -15,6 +17,7 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 
+from observatorio.recoleccion import fechas
 from observatorio.recoleccion.clientes import ClienteHTTP
 
 log = logging.getLogger("scraper")
@@ -41,21 +44,12 @@ def _article_body_desde_jsonld(html: str) -> Optional[str]:
     return None
 
 
-def extraer_texto_articulo(url: str, cliente: ClienteHTTP) -> Optional[str]:
-    """
-    Descarga el artículo completo e intenta extraer el texto principal.
-    Usa newspaper3k si está disponible, si no, heurística con BeautifulSoup.
-    """
-    html = cliente.get(url)
-    if not html:
-        return None
-
-    # Muchos medios exponen el cuerpo completo en JSON-LD aunque newspaper falle.
+def _texto_desde_html(url: str, html: str) -> Optional[str]:
+    """Cuerpo del artículo: JSON-LD → newspaper3k → heurística de párrafos."""
     texto_jsonld = _article_body_desde_jsonld(html)
     if texto_jsonld:
         return texto_jsonld
 
-    # Intentar con newspaper3k (mejor extracción)
     try:
         from newspaper import Article
 
@@ -69,7 +63,6 @@ def extraer_texto_articulo(url: str, cliente: ClienteHTTP) -> Optional[str]:
     except Exception as e:
         log.debug("newspaper3k falló en %s: %s", url, e)
 
-    # Fallback: heurística con BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
     for selector in [
         "article", "[class*='article-body']", "[class*='entry-content']",
@@ -87,3 +80,26 @@ def extraer_texto_articulo(url: str, cliente: ClienteHTTP) -> Optional[str]:
                 return texto[:5000]
 
     return None
+
+
+def extraer_articulo(url: str, cliente: ClienteHTTP) -> dict:
+    """
+    Descarga el artículo una vez y devuelve lo que solo está en su página.
+
+    `{"texto": str|None, "fecha_pub": str|None, "fecha_pub_origen": str|None}`
+
+    La fecha es la razón de ser de esta función tanto como el texto: para las
+    cabeceras que entran por portada, es la única forma de saber cuándo publicó
+    el medio en lugar de cuándo pasó el scraper.
+    """
+    vacio = {"texto": None, "fecha_pub": None, "fecha_pub_origen": None}
+    html = cliente.get(url)
+    if not html:
+        return vacio
+
+    fecha, origen = fechas.fecha_desde_html(html)
+    return {
+        "texto": _texto_desde_html(url, html),
+        "fecha_pub": fecha,
+        "fecha_pub_origen": origen,
+    }

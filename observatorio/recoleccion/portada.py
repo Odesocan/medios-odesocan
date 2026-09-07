@@ -21,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from observatorio.comun.texto import seccion_desde_url
+from observatorio.recoleccion import fechas
 from observatorio.config.scraping import SCRAPER
 from observatorio.recoleccion.clientes import ClientePlaywright
 
@@ -58,6 +59,7 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                     if url and nombre and url not in vistos:
                         if _url_html_permitida(url, cfg):
                             vistos.add(url)
+                            _fecha_url = fechas.fecha_desde_url(url)
                             noticias.append({
                                 "medio": medio_id,
                                 "url": url,
@@ -65,7 +67,8 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                                 "posicion": len(noticias) + 1,
                                 "seccion": seccion_desde_url(url),
                                 "resumen": "",
-                                "fecha_pub": datetime.now(timezone.utc).isoformat(),
+                                "fecha_pub": _fecha_url or fechas.ahora(),
+                                "fecha_pub_origen": fechas.URL if _fecha_url else fechas.SINTETICA,
                                 "fuente": "html",
                                 "raw": {"origen": "json-ld", "tipo": "ItemList"},
                             })
@@ -79,6 +82,8 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                 if url and titulo and url not in vistos:
                     if _url_html_permitida(url, cfg):
                         vistos.add(url)
+                        _fecha_jsonld = fechas.parsear_fecha(blob.get("datePublished"))
+                        _fecha_url = fechas.fecha_desde_url(url)
                         noticias.append({
                             "medio": medio_id,
                             "url": url,
@@ -86,7 +91,11 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                             "posicion": len(noticias) + 1,
                             "seccion": seccion_desde_url(url),
                             "resumen": (blob.get("description") or "")[:800],
-                            "fecha_pub": blob.get("datePublished") or datetime.now(timezone.utc).isoformat(),
+                            "fecha_pub": _fecha_jsonld or _fecha_url or fechas.ahora(),
+                            "fecha_pub_origen": (
+                                fechas.JSONLD_PORTADA if _fecha_jsonld
+                                else fechas.URL if _fecha_url
+                                else fechas.SINTETICA),
                             "fuente": "html",
                             "raw": {"origen": "json-ld", "tipo": blob.get("@type")},
                         })
@@ -149,6 +158,8 @@ def parsear_html_portada(
             continue
         vistos.add(url)
 
+        _fecha_url = fechas.fecha_desde_url(url)
+
         # Intentar obtener resumen del nodo adyacente
         resumen = ""
         if sel_resumen:
@@ -167,7 +178,8 @@ def parsear_html_portada(
             "posicion": len(noticias) + 1,
             "seccion": seccion_desde_url(url),
             "resumen": resumen,
-            "fecha_pub": datetime.now(timezone.utc).isoformat(),
+            "fecha_pub": _fecha_url or fechas.ahora(),
+            "fecha_pub_origen": fechas.URL if _fecha_url else fechas.SINTETICA,
             "fuente": "html",
             "raw": {"origen": "portada", "selector": sel_titular},
         })

@@ -77,7 +77,7 @@ def _noticias_sqlite(
     query = f"""
         SELECT url, url_hash, medio, titulo, resumen, texto_full,
                fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
-               clasificador_version
+               clasificador_version, fecha_pub_origen
         FROM noticias
         {"WHERE url_hash NOT IN (" + placeholders + ")" if excluir_hashes else ""}
         ORDER BY fecha_scrap ASC
@@ -183,7 +183,7 @@ def sincronizar(
             INSERT INTO {schema}.noticias
                 (url, url_hash, medio, titulo, resumen, texto_full,
                  fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
-               clasificador_version)
+                 clasificador_version, fecha_pub_origen)
             VALUES %s
             ON CONFLICT (url_hash) DO NOTHING
         """
@@ -205,6 +205,7 @@ def sincronizar(
                     _temas_para_supabase(n),
                     n.get("seccion"),
                     n.get("clasificador_version"),
+                    n.get("fecha_pub_origen"),
                 )
                 for n in lote
             ]

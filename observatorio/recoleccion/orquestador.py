@@ -35,7 +35,8 @@ from observatorio.clasificacion.motor import clasificar
 from observatorio.comun.registro import configurar_logging
 from observatorio.config.medios import MEDIOS
 from observatorio.config.scraping import SCRAPER
-from observatorio.recoleccion.articulo import extraer_texto_articulo
+from observatorio.recoleccion import fechas
+from observatorio.recoleccion.articulo import extraer_articulo
 from observatorio.recoleccion.clientes import (
     _PLAYWRIGHT_DISPONIBLE,
     ClienteHTTP,
@@ -75,7 +76,8 @@ def scrapear_medio(
     log.info("━━ Scraping: %s ━━", cfg["nombre"])
     inicio = datetime.now(timezone.utc).isoformat()
     stats = {"medio": medio_id, "total": 0, "nuevas": 0, "observadas": 0,
-             "sin_tema": 0, "con_texto": 0, "errores": 0}
+             "sin_tema": 0, "con_texto": 0, "fecha_real": 0, "fecha_mejorada": 0,
+             "errores": 0}
     status = "ok"
 
     # Registrar inicio en log de BD
@@ -169,15 +171,26 @@ def scrapear_medio(
             n["temas"] = temas
             if not temas:
                 stats["sin_tema"] += 1
+            if n.get("fecha_pub_origen") != fechas.SINTETICA:
+                stats["fecha_real"] += 1
 
             # El cuerpo solo se descarga para lo que entra en la agenda temática
             # y mientras quede presupuesto. Lo demás se guarda igual, para que
             # exista denominador, pero sin gastar una petición.
             if extraer_articulos and temas and presupuesto_texto > 0:
-                n["texto_full"] = extraer_texto_articulo(n["url"], cliente)
+                articulo = extraer_articulo(n["url"], cliente)
                 presupuesto_texto -= 1
-                if n["texto_full"]:
+                n["texto_full"] = articulo["texto"]
+                if articulo["texto"]:
                     stats["con_texto"] += 1
+                # La fecha del artículo solo sustituye a la que ya traía la
+                # pieza si es estrictamente mejor: la del feed no se pisa, pero
+                # la deducida de la URL (precisión de día) sí se mejora con una
+                # que trae hora exacta.
+                if fechas.mejor_que(articulo["fecha_pub_origen"], n.get("fecha_pub_origen")):
+                    n["fecha_pub"] = articulo["fecha_pub"]
+                    n["fecha_pub_origen"] = articulo["fecha_pub_origen"]
+                    stats["fecha_mejorada"] += 1
 
             if guardar_noticia(conn, n):
                 stats["nuevas"] += 1
@@ -209,9 +222,10 @@ def scrapear_medio(
             cliente_pw.close()
 
     log.info(
-        "  Resultado: %d nuevas / %d observadas / %d en portada · %d sin tema · %d con texto · %d errores",
-        stats["nuevas"], stats["observadas"], stats["total"],
-        stats["sin_tema"], stats["con_texto"], stats["errores"],
+        "  Resultado: %d nuevas / %d observadas / %d en portada · %d sin tema · "
+        "%d con texto · %d con fecha real (%d mejoradas) · %d errores",
+        stats["nuevas"], stats["observadas"], stats["total"], stats["sin_tema"],
+        stats["con_texto"], stats["fecha_real"], stats["fecha_mejorada"], stats["errores"],
     )
     return stats
 

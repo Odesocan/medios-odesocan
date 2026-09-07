@@ -17,6 +17,7 @@ from typing import Optional
 import feedparser
 
 from observatorio.comun.texto import limpiar_html, seccion_desde_url
+from observatorio.recoleccion import fechas
 from observatorio.config.scraping import SCRAPER, USER_AGENTS
 from observatorio.recoleccion.clientes import ClienteHTTP, _esperar
 
@@ -104,6 +105,8 @@ def parsear_rss(
             or getattr(entry, "description", "")
             or ""
         )
+        _fecha_feed = _normalizar_fecha(entry)
+        _fecha_url = fechas.fecha_desde_url(url)
         etiquetas = [t.term for t in getattr(entry, "tags", [])]
         noticias.append({
             "medio": medio_id,
@@ -114,7 +117,10 @@ def parsear_rss(
             "posicion": posicion,
             "seccion": (etiquetas[0].lower() if etiquetas else seccion_desde_url(url)),
             "resumen": limpiar_html(resumen_raw)[:800],
-            "fecha_pub": _normalizar_fecha(entry),
+            "fecha_pub": _fecha_feed or _fecha_url or fechas.ahora(),
+            "fecha_pub_origen": (fechas.FEED if _fecha_feed
+                                 else fechas.URL if _fecha_url
+                                 else fechas.SINTETICA),
             "fuente": "rss",
             "raw": {
                 "feed_url": feed_url,
