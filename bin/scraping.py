@@ -37,7 +37,11 @@ import time
 
 import schedule
 
-from observatorio.almacenamiento.postgres import sincronizar, sincronizar_log
+from observatorio.almacenamiento.postgres import (
+    sincronizar,
+    sincronizar_log,
+    sincronizar_observaciones,
+)
 from observatorio.comun.registro import configurar_logging
 from observatorio.recoleccion.orquestador import scrapear_todos
 
@@ -59,7 +63,9 @@ def job() -> None:
         log.info("▶ Sincronizando con Supabase…")
         stats = sincronizar()
         sincronizar_log(resultados)
-        log.info("✓ Supabase — %d insertadas / %d errores", stats["insertadas"], stats["errores"])
+        observaciones = sincronizar_observaciones()
+        log.info("✓ Supabase — %d insertadas / %d observaciones / %d errores",
+                 stats["insertadas"], observaciones, stats["errores"])
     except Exception as e:
         log.error("✗ Error en sincronización Supabase: %s", e, exc_info=True)
 

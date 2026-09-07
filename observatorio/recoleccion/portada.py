@@ -20,6 +20,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
+from observatorio.comun.texto import seccion_desde_url
 from observatorio.config.scraping import SCRAPER
 from observatorio.recoleccion.clientes import ClientePlaywright
 
@@ -61,6 +62,8 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                                 "medio": medio_id,
                                 "url": url,
                                 "titulo": nombre,
+                                "posicion": len(noticias) + 1,
+                                "seccion": seccion_desde_url(url),
                                 "resumen": "",
                                 "fecha_pub": datetime.now(timezone.utc).isoformat(),
                                 "fuente": "html",
@@ -80,16 +83,18 @@ def _extraer_desde_jsonld_portada(html: str, medio_id: str, cfg: dict, max_items
                             "medio": medio_id,
                             "url": url,
                             "titulo": titulo,
+                            "posicion": len(noticias) + 1,
+                            "seccion": seccion_desde_url(url),
                             "resumen": (blob.get("description") or "")[:800],
                             "fecha_pub": blob.get("datePublished") or datetime.now(timezone.utc).isoformat(),
                             "fuente": "html",
                             "raw": {"origen": "json-ld", "tipo": blob.get("@type")},
                         })
 
-            if len(noticias) >= max_items:
+            if max_items and len(noticias) >= max_items:
                 break
 
-    return noticias[:max_items]
+    return noticias[:max_items] if max_items else noticias
 
 
 def parsear_html_portada(
@@ -110,11 +115,15 @@ def parsear_html_portada(
     if not cfg.get("selectores"):
         return []
     if max_items <= 0:
-        max_items = SCRAPER["max_items_por_medio"]
+        max_items = SCRAPER["max_listado_por_medio"]
 
     motor = "Playwright" if isinstance(cliente, ClientePlaywright) else "HTML"
     log.info("  %s: %s", motor, cfg["url"])
-    html = cliente.get(cfg["url"])
+    # Sin caché: el listado de portada cambia a diario y la caché dura 7 días.
+    # Servirlo caducado fabricaría permanencia falsa en la tabla de observaciones.
+    # (La caché sigue teniendo sentido para el cuerpo de los artículos, que no
+    # cambia; eso lo hace recoleccion/articulo.py.)
+    html = cliente.get(cfg["url"], usar_cache=False)
     if not html:
         return []
 
@@ -153,23 +162,27 @@ def parsear_html_portada(
             "medio": medio_id,
             "url": url,
             "titulo": titulo,
+            # Rango en el orden del DOM de la portada, que aproxima la prominencia
+            # visual. Es una aproximación: el CSS puede reordenar lo que se ve.
+            "posicion": len(noticias) + 1,
+            "seccion": seccion_desde_url(url),
             "resumen": resumen,
             "fecha_pub": datetime.now(timezone.utc).isoformat(),
             "fuente": "html",
             "raw": {"origen": "portada", "selector": sel_titular},
         })
-        if len(noticias) >= max_items:
+        if max_items and len(noticias) >= max_items:
             break
 
     # ── Fallback JSON-LD: complementar si los selectores CSS dieron pocos resultados
-    if len(noticias) < max_items // 2:
+    if len(noticias) < (max_items // 2 if max_items else 8):
         log.info("  JSON-LD fallback (selectores CSS dieron solo %d)", len(noticias))
         jsonld_noticias = _extraer_desde_jsonld_portada(html, medio_id, cfg, max_items)
         for n in jsonld_noticias:
             if n["url"] not in vistos:
                 vistos.add(n["url"])
                 noticias.append(n)
-                if len(noticias) >= max_items:
+                if max_items and len(noticias) >= max_items:
                     break
 
     log.info("  → %d titulares %s en %s", len(noticias), motor, cfg["url"])

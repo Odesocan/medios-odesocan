@@ -40,7 +40,26 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
             fecha_scrap TEXT    NOT NULL,
             fuente      TEXT    NOT NULL,   -- 'rss' | 'html'
             raw_json    TEXT,               -- payload original del feed
-            temas       TEXT                -- JSON array de temas clasificados
+            temas       TEXT,               -- JSON array de temas clasificados
+            seccion     TEXT                -- sección propia del medio (feed o URL)
+        );
+
+        -- Una fila por pieza VISTA en cada ejecución, exista ya o no.
+        --
+        -- La tabla `noticias` guarda el alta: una fila por URL, la primera vez
+        -- que aparece. Esta guarda la permanencia, que es la otra mitad de la
+        -- saliencia: una pieza que aguanta cinco días en portada es más
+        -- prominente que una que dura dos horas, y sin este registro esa
+        -- diferencia se perdía en la ingesta y no era reconstruible después.
+        CREATE TABLE IF NOT EXISTS observaciones (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            url_hash     TEXT    NOT NULL,
+            medio        TEXT    NOT NULL,
+            run_id       TEXT    NOT NULL,   -- identificador de la ejecución
+            observado_en TEXT    NOT NULL,   -- ISO 8601 UTC del momento de la observación
+            posicion     INTEGER,            -- rango dentro de su listado de origen
+            fuente       TEXT    NOT NULL,   -- 'rss' | 'html' | 'wp_json'
+            UNIQUE (url_hash, run_id)
         );
 
         CREATE TABLE IF NOT EXISTS scraping_log (
@@ -57,9 +76,12 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_medio      ON noticias(medio);
         CREATE INDEX IF NOT EXISTS idx_fecha_pub  ON noticias(fecha_pub);
         CREATE INDEX IF NOT EXISTS idx_url_hash   ON noticias(url_hash);
+        CREATE INDEX IF NOT EXISTS idx_obs_run    ON observaciones(run_id);
+        CREATE INDEX IF NOT EXISTS idx_obs_hash   ON observaciones(url_hash);
+        CREATE INDEX IF NOT EXISTS idx_obs_medio  ON observaciones(medio, observado_en);
     """)
     # Migración: añadir columnas nuevas si la BD ya existía sin ellas
-    for col, defn in [("temas", "TEXT"), ("texto_full", "TEXT")]:
+    for col, defn in [("temas", "TEXT"), ("texto_full", "TEXT"), ("seccion", "TEXT")]:
         try:
             conn.execute(f"ALTER TABLE noticias ADD COLUMN {col} {defn}")
             conn.commit()
@@ -79,22 +101,27 @@ def ya_existe(conn: sqlite3.Connection, url: str) -> bool:
 
 
 def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
-    """Inserta noticia. Devuelve True si es nueva, False si ya existía."""
+    """Inserta la pieza. Devuelve True si es nueva, False si ya estaba.
+
+    Ya NO se descarta la pieza que no encaja en ningún tema: se guarda con
+    `temas` vacío. Sin ella no hay denominador, y la saliencia es por definición
+    una magnitud relativa al total de la producción del medio. Filtrar por tema
+    es cosa de la consulta, no de la ingesta.
+    """
     h = url_hash(noticia["url"])
-    temas = noticia.get("temas") or clasificar(
-        noticia.get("titulo", ""),
-        noticia.get("resumen", ""),
-        noticia.get("url", ""),
-    )
-    if not temas:
-        log.info("Noticia descartada sin temas: %s", noticia["titulo"][:80])
-        return False
+    temas = noticia.get("temas")
+    if temas is None:
+        temas = clasificar(
+            noticia.get("titulo", ""),
+            noticia.get("resumen", ""),
+            noticia.get("url", ""),
+        )
     try:
         conn.execute(
             """INSERT INTO noticias
                (url, url_hash, medio, titulo, resumen, texto_full,
-                fecha_pub, fecha_scrap, fuente, raw_json, temas)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 noticia["url"], h, noticia["medio"],
                 noticia["titulo"], noticia.get("resumen"),
@@ -103,12 +130,42 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
                 noticia["fuente"],
                 json.dumps(noticia.get("raw"), ensure_ascii=False),
                 json.dumps(temas, ensure_ascii=False),
+                noticia.get("seccion"),
             ),
         )
         conn.commit()
         return True
     except sqlite3.IntegrityError:
         return False   # duplicado, normal
+
+
+def registrar_observacion(
+    conn: sqlite3.Connection,
+    noticia: dict,
+    run_id: str,
+    observado_en: str,
+) -> bool:
+    """
+    Deja constancia de que la pieza estaba en portada en esta ejecución.
+
+    Se llama SIEMPRE, aunque la pieza ya estuviera en la base: es lo que permite
+    medir cuánto tiempo aguanta y en qué posición. Devuelve False si la pieza ya
+    se había observado en esta misma ejecución (duplicado dentro de la tirada).
+    """
+    try:
+        conn.execute(
+            """INSERT INTO observaciones
+               (url_hash, medio, run_id, observado_en, posicion, fuente)
+               VALUES (?,?,?,?,?,?)""",
+            (
+                url_hash(noticia["url"]), noticia["medio"], run_id, observado_en,
+                noticia.get("posicion"), noticia["fuente"],
+            ),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
 
 
 def conectar_sqlite() -> sqlite3.Connection:

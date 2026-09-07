@@ -34,6 +34,46 @@ except ImportError:
 
 log = logging.getLogger("scraper")
 
+
+def _codificaciones_soportadas() -> str:
+    """
+    Accept-Encoding construido con lo que REALMENTE se sabe descomprimir.
+
+    Anunciar `br` sin tener instalado brotli es un fallo silencioso: httpx
+    devuelve los bytes sin descomprimir, `r.text` da binario, el binario supera
+    el control de longitud mínima y acaba cacheado como si fuera HTML. El medio
+    afectado rinde cero sin que salte ningún error.
+    """
+    codecs = ["gzip", "deflate"]
+    try:
+        import brotli  # noqa: F401
+        codecs.append("br")
+    except ImportError:
+        try:
+            import brotlicffi  # noqa: F401
+            codecs.append("br")
+        except ImportError:
+            pass
+    return ", ".join(codecs)
+
+
+_ACCEPT_ENCODING = _codificaciones_soportadas()
+
+
+def _parece_markup(texto: str) -> bool:
+    """¿La respuesta parece HTML/XML/JSON y no binario mal descomprimido?"""
+    if not texto:
+        return False
+    cabeza = texto.lstrip()[:400].lower()
+    if cabeza.startswith(("{", "[")):          # JSON (API de WordPress)
+        return True
+    if any(m in cabeza for m in ("<!doctype", "<html", "<?xml", "<rss", "<feed")):
+        return True
+    # Último recurso: densidad de caracteres imprimibles en la cabecera
+    muestra = texto[:1000]
+    imprimibles = sum(1 for c in muestra if c.isprintable() or c in "\n\r\t")
+    return imprimibles / max(len(muestra), 1) > 0.9
+
 # ── Helpers de comportamiento humano ─────────────────────────────────────────
 
 def _esperar(feed: bool = False) -> None:
@@ -73,7 +113,7 @@ def _headers_navegador(ua: str, es_feed: bool = False) -> dict:
                 "es-ES,es;q=0.9",
                 "es-ES,es;q=0.9,en;q=0.8",
             ]),
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": _ACCEPT_ENCODING,
             "Connection": "keep-alive",
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
@@ -92,7 +132,7 @@ def _headers_navegador(ua: str, es_feed: bool = False) -> dict:
             "es-ES,es;q=0.9,en;q=0.8",
             "es;q=0.9,en-US;q=0.8,en;q=0.7",
         ]),
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": _ACCEPT_ENCODING,
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Dest": "document",
@@ -159,11 +199,17 @@ class ClienteHTTP:
                 r.raise_for_status()
                 html = r.text
                 # Validación básica: descartar respuestas vacías o demasiado cortas
-                if html and len(html.strip()) > 200:
+                if html and len(html.strip()) > 200 and _parece_markup(html):
                     cache_file.write_text(html, encoding="utf-8")
                     return html
+                elif html and not _parece_markup(html):
+                    # No se cachea: cachear binario envenena la caché durante
+                    # `cache_ttl_dias` y deja al medio a cero sin ningún error.
+                    log.warning(
+                        "Respuesta ilegible (¿compresión no soportada?) en %s — no se cachea", url)
                 else:
-                    log.warning("Respuesta sospechosamente corta (%d bytes) para %s", len(html), url)
+                    log.warning("Respuesta sospechosamente corta (%d bytes) para %s",
+                                len(html or ""), url)
             except httpx.HTTPStatusError as e:
                 log.warning(
                     "HTTP %s en %s (intento %d, UA: ...%s)",
@@ -219,8 +265,13 @@ class ClientePlaywright:
         self._pw = _sync_playwright().__enter__()
         self._browser = self._pw.chromium.launch(headless=True)
 
-    def get(self, url: str, wait_until: str = "networkidle") -> Optional[str]:
-        """Navega a `url` y devuelve el HTML completamente renderizado."""
+    def get(self, url: str, wait_until: str = "networkidle", usar_cache: bool = True) -> Optional[str]:
+        """Navega a `url` y devuelve el HTML completamente renderizado.
+
+        `usar_cache` se acepta y se ignora: Playwright no cachea, pero la firma
+        tiene que coincidir con la de ClienteHTTP porque ambos se usan
+        indistintamente por duck-typing.
+        """
         ctx = None
         try:
             ctx = self._browser.new_context(

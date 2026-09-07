@@ -5,7 +5,7 @@ Este subpaquete reúne todo lo que se edita para cambiar QUÉ se observa, sin
 tocar la lógica. Cada módulo cubre una decisión distinta:
 
     rutas.py        dónde viven la base local, la caché y los logs
-    medios.py       las 14 cabeceras que se raspan
+    medios.py       las 17 cabeceras que se raspan
     temas.py        los 15 temas y sus diccionarios de palabras clave
     scraping.py     ritmo de las peticiones y pool de User-Agents
     credenciales.py conexión a Supabase (todo por variable de entorno)

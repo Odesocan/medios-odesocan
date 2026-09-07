@@ -75,7 +75,7 @@ def _noticias_sqlite(
     placeholders = ",".join("?" * len(excluir_hashes)) if excluir_hashes else "''"
     query = f"""
         SELECT url, url_hash, medio, titulo, resumen, texto_full,
-               fecha_pub, fecha_scrap, fuente, raw_json, temas
+               fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion
         FROM noticias
         {"WHERE url_hash NOT IN (" + placeholders + ")" if excluir_hashes else ""}
         ORDER BY fecha_scrap ASC
@@ -114,22 +114,15 @@ def _normalizar_temas(temas_raw: object) -> list[str]:
     ]
 
 
-def _purgar_noticias_sin_temas(sq: sqlite3.Connection) -> int:
-    """Elimina de SQLite las noticias sin temas clasificables."""
-    filas = sq.execute("SELECT id, url_hash, temas FROM noticias").fetchall()
-    ids_a_borrar = [
-        fila["id"]
-        for fila in filas
-        if not _normalizar_temas(fila["temas"])
-    ]
-    if not ids_a_borrar:
-        return 0
+def _sin_tema(sq: sqlite3.Connection) -> int:
+    """Cuenta las piezas sin tema. Antes esta función las BORRABA.
 
-    placeholders = ",".join("?" * len(ids_a_borrar))
-    sq.execute(f"DELETE FROM noticias WHERE id IN ({placeholders})", ids_a_borrar)
-    sq.commit()
-    log.info("Noticias eliminadas de SQLite por temas vacíos/NA: %d", len(ids_a_borrar))
-    return len(ids_a_borrar)
+    Se conservan a propósito: son el denominador. Sin ellas solo puede
+    calcularse la cuota dentro de la agenda de ODESOCAN, no dentro de la
+    producción del medio, que es lo que mide la saliencia.
+    """
+    filas = sq.execute("SELECT temas FROM noticias").fetchall()
+    return sum(1 for f in filas if not _normalizar_temas(f["temas"]))
 
 
 def _temas_para_supabase(noticia: dict) -> list[str]:
@@ -151,14 +144,14 @@ def sincronizar(
     schema = SUPABASE["schema"]
     stats = {
         "total_locales": 0,
-        "eliminadas": 0,
+        "sin_tema": 0,
         "pendientes": 0,
         "insertadas": 0,
         "errores": 0,
     }
 
     try:
-        stats["eliminadas"] = _purgar_noticias_sin_temas(sq)
+        stats["sin_tema"] = _sin_tema(sq)
 
         # Total en SQLite
         stats["total_locales"] = sq.execute("SELECT COUNT(*) FROM noticias").fetchone()[0]
@@ -187,7 +180,7 @@ def sincronizar(
         insert_sql = f"""
             INSERT INTO {schema}.noticias
                 (url, url_hash, medio, titulo, resumen, texto_full,
-                 fecha_pub, fecha_scrap, fuente, raw_json, temas)
+                 fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion)
             VALUES %s
             ON CONFLICT (url_hash) DO NOTHING
         """
@@ -207,6 +200,7 @@ def sincronizar(
                     n["fuente"],
                     Json(json.loads(n["raw_json"])) if n.get("raw_json") else None,
                     _temas_para_supabase(n),
+                    n.get("seccion"),
                 )
                 for n in lote
             ]
@@ -240,12 +234,16 @@ def sincronizar(
 
 
 def actualizar_temas_vacios() -> int:
-    """Reclasifica en Supabase los registros sin temas y elimina los no clasificables."""
+    """Reclasifica en Supabase los registros con `temas` a NULL.
+
+    Los que sigan sin encajar en ningún tema quedan con array vacío, no se
+    borran: son parte del denominador.
+    """
     configurar_logging("supabase")
     pg = conectar_supabase()
     schema = SUPABASE["schema"]
     actualizados = 0
-    eliminados = 0
+    sin_tema = 0
     try:
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(f"SELECT url_hash, titulo, resumen FROM {schema}.noticias WHERE temas IS NULL")
@@ -259,22 +257,20 @@ def actualizar_temas_vacios() -> int:
         with pg.cursor() as cur:
             for fila in filas:
                 temas = clasificar(fila["titulo"] or "", fila["resumen"] or "")
+                # Antes, las que seguían sin tema se BORRABAN. Ahora se marcan
+                # con array vacío: siguen contando para el denominador.
+                cur.execute(
+                    f"UPDATE {schema}.noticias SET temas = %s WHERE url_hash = %s",
+                    (temas, fila["url_hash"]),
+                )
                 if temas:
-                    cur.execute(
-                        f"UPDATE {schema}.noticias SET temas = %s WHERE url_hash = %s",
-                        (temas, fila["url_hash"]),
-                    )
                     actualizados += 1
                 else:
-                    cur.execute(
-                        f"DELETE FROM {schema}.noticias WHERE url_hash = %s",
-                        (fila["url_hash"],),
-                    )
-                    eliminados += 1
+                    sin_tema += 1
         pg.commit()
         log.info("Temas actualizados: %d registros", actualizados)
-        if eliminados:
-            log.info("Noticias eliminadas en Supabase por temas vacíos/NA: %d", eliminados)
+        if sin_tema:
+            log.info("Marcadas como sin tema (se conservan por el denominador): %d", sin_tema)
     except Exception as e:
         pg.rollback()
         log.error("Error actualizando temas: %s", e, exc_info=True)
@@ -333,3 +329,62 @@ def sincronizar_log(run_stats: list[dict]) -> None:
     finally:
         sq.close()
         pg.close()
+
+
+def sincronizar_observaciones(limit: Optional[int] = None) -> int:
+    """
+    Copia la tabla `observaciones` de SQLite a Supabase.
+
+    Una fila por pieza vista en cada ejecución. Es lo que permite medir cuánto
+    aguanta una pieza en portada y en qué posición, es decir, la duración de la
+    atención además del alta. Se deduplica por (url_hash, run_id).
+    """
+    configurar_logging("supabase")
+    sq = conectar_sqlite()
+    pg = conectar_supabase()
+    schema = SUPABASE["schema"]
+    enviadas = 0
+
+    try:
+        with pg.cursor() as cur:
+            cur.execute(f"SELECT DISTINCT run_id FROM {schema}.observaciones")
+            ya_en_pg = {fila[0] for fila in cur.fetchall()}
+
+        consulta = "SELECT url_hash, medio, run_id, observado_en, posicion, fuente FROM observaciones"
+        if limit:
+            consulta += f" LIMIT {int(limit)}"
+        filas = [dict(f) for f in sq.execute(consulta).fetchall()]
+        pendientes = [f for f in filas if f["run_id"] not in ya_en_pg]
+
+        if not pendientes:
+            log.info("observaciones: nada que sincronizar")
+            return 0
+
+        insert_sql = f"""
+            INSERT INTO {schema}.observaciones
+                (url_hash, medio, run_id, observado_en, posicion, fuente)
+            VALUES %s
+            ON CONFLICT (url_hash, run_id) DO NOTHING
+        """
+        lote_size = 500
+        for i in range(0, len(pendientes), lote_size):
+            lote = pendientes[i : i + lote_size]
+            valores = [
+                (f["url_hash"], f["medio"], f["run_id"], f["observado_en"],
+                 f["posicion"], f["fuente"])
+                for f in lote
+            ]
+            with pg.cursor() as cur:
+                psycopg2.extras.execute_values(cur, insert_sql, valores)
+            pg.commit()
+            enviadas += len(lote)
+
+        log.info("observaciones: %d filas sincronizadas", enviadas)
+    except Exception as e:
+        pg.rollback()
+        log.error("Error sincronizando observaciones: %s", e, exc_info=True)
+    finally:
+        sq.close()
+        pg.close()
+
+    return enviadas

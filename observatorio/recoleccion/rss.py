@@ -5,7 +5,8 @@ Doble intento por diseño: primero `feedparser` fetcha la URL directamente (con
 UA de navegador y Accept XML, más compatible con algunos WAF/CDN) y, si falla o
 devuelve cero entradas, se reintenta con `httpx` a través de `ClienteHTTP`.
 
-Solo 5 de los 14 medios tienen un feed utilizable; el resto va por portada.
+7 de las 17 cabeceras tienen un feed utilizable; el resto va por portada o por
+la API de WordPress.
 """
 
 import logging
@@ -15,7 +16,7 @@ from typing import Optional
 
 import feedparser
 
-from observatorio.comun.texto import limpiar_html
+from observatorio.comun.texto import limpiar_html, seccion_desde_url
 from observatorio.config.scraping import SCRAPER, USER_AGENTS
 from observatorio.recoleccion.clientes import ClienteHTTP, _esperar
 
@@ -50,7 +51,7 @@ def parsear_rss(
       2. Si falla o devuelve 0 entradas, httpx como fallback con UA rotativo.
     """
     if max_items <= 0:
-        max_items = SCRAPER["max_items_por_medio"]
+        max_items = SCRAPER["max_listado_por_medio"]
 
     log.info("  RSS: %s", feed_url)
     ua = random.choice(USER_AGENTS)
@@ -91,7 +92,8 @@ def parsear_rss(
         return []
 
     noticias = []
-    for entry in feed.entries[:max_items]:
+    entradas = feed.entries[:max_items] if max_items > 0 else feed.entries
+    for posicion, entry in enumerate(entradas, start=1):
         url = getattr(entry, "link", None)
         titulo = limpiar_html(getattr(entry, "title", ""))
         if not url or not titulo:
@@ -102,17 +104,22 @@ def parsear_rss(
             or getattr(entry, "description", "")
             or ""
         )
+        etiquetas = [t.term for t in getattr(entry, "tags", [])]
         noticias.append({
             "medio": medio_id,
             "url": url.strip(),
             "titulo": titulo,
+            # Rango dentro de ESTE feed. No es comparable con la posición en la
+            # portada HTML: son dos listados distintos, y por eso viaja `fuente`.
+            "posicion": posicion,
+            "seccion": (etiquetas[0].lower() if etiquetas else seccion_desde_url(url)),
             "resumen": limpiar_html(resumen_raw)[:800],
             "fecha_pub": _normalizar_fecha(entry),
             "fuente": "rss",
             "raw": {
                 "feed_url": feed_url,
                 "feed_title": feed.feed.get("title", ""),
-                "tags": [t.term for t in getattr(entry, "tags", [])],
+                "tags": etiquetas,
             },
         })
 

@@ -14,8 +14,18 @@ SCRAPER = {
     "timeout": 15,
     # Máximo de reintentos ante error 5xx o timeout
     "max_reintentos": 3,
-    # Máximo de noticias a guardar por medio y ejecución
-    "max_items_por_medio": 50,
+    # Tope del LISTADO de portada/feed. 0 = sin límite.
+    # El listado cuesta una sola petición por medio, así que recortarlo no ahorra
+    # tráfico y sí destruye el denominador: la portada es un objeto finito y es
+    # justo la unidad que declara el cuaderno metodológico. Se recorre entera.
+    "max_listado_por_medio": 0,
+    # Tope de descargas de TEXTO COMPLETO por medio y ejecución. Esto sí cuesta
+    # una petición por pieza, así que es aquí donde tiene sentido limitar.
+    # 20 por cabecera y ejecución. El presupuesto solo lo gastan las piezas
+    # NUEVAS y CON TEMA, así que en un día normal apenas se agota. El número
+    # sale del tiempo: cada descarga cuesta ~6 s con las pausas de cortesía,
+    # así que 17 cabeceras × 20 ≈ 34 min, dentro del timeout del workflow.
+    "max_articulos_por_medio": 20,
     # Días que se conserva el caché HTML
     "cache_ttl_dias": 7,
     # robots.txt desactivado: monitoreo académico con 1 ejecución/día,

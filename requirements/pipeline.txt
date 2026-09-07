@@ -7,6 +7,7 @@
 # ── Scraping ──────────────────────────────────────────────────────────────────
 feedparser==6.0.11
 httpx==0.28.1
+brotli==1.1.0          # sin esto httpx no descomprime `br` y guarda binario
 beautifulsoup4==4.12.3
 lxml==5.3.1
 newspaper3k==0.2.8

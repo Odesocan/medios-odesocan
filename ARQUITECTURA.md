@@ -12,7 +12,8 @@ no a números de línea, para que no caduquen al editar.
 
 ## 1. Qué es este proyecto en una frase
 
-Un **pipeline de observación de prensa**: cada día raspa 14 cabeceras canarias,
+Un **pipeline de observación de prensa**: cada día raspa 17 cabeceras canarias
+—doce diarios digitales, dos agencias y la radiotelevisión pública—,
 clasifica cada noticia en 15 temas de política social mediante un clasificador
 híbrido (keywords + lemas + URL + similitud vectorial), vuelca lo nuevo a una
 base PostgreSQL alojada en Supabase, y lo publica en un dashboard estático D3
@@ -38,7 +39,7 @@ medios-odesocan/
 │   └── publicacion/        el dashboard (legado)
 │
 ├── bin/                    PUNTOS DE ENTRADA — lo único que se ejecuta
-├── db/                     esquema SQL versionado
+├── db/                     esquema SQL versionado (esquema.sql + wordcloud.sql)
 ├── requirements/           dependencias, una lista por pipeline
 ├── .github/workflows/      los dos crons
 │
@@ -69,7 +70,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 |---|---|
 | **`config/`** | |
 | `rutas.py` | `BASE_DIR`, `DATA_DIR`, `DB_PATH`, `CACHE_DIR`, `LOG_DIR`. Crea los directorios al importarse. |
-| `medios.py` | `MEDIOS`: las 14 cabeceras, con feeds, selectores CSS y filtros de URL. |
+| `medios.py` | `MEDIOS`: las 17 cabeceras, con feeds, selectores CSS y filtros de URL. |
 | `temas.py` | `TEMAS`: los 15 temas con sus diccionarios de keywords y su `peso_titulo`. |
 | `scraping.py` | `SCRAPER` (ritmo, timeouts, cuotas) y `USER_AGENTS` (12 navegadores). |
 | `credenciales.py` | `SUPABASE`: conexión Postgres, todo por variable de entorno. |
@@ -80,6 +81,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 | **`recoleccion/`** | |
 | `clientes.py` | `ClienteHTTP` (httpx + caché + reintentos), `ClientePlaywright` (Chromium), `_esperar()`, `_headers_navegador()`. |
 | `rss.py` | `parsear_rss()`, `_normalizar_fecha()`. |
+| `wp_json.py` | `parsear_wp_json()`: API REST de WordPress, para medios cuya portada mezcla noticias con programación. |
 | `portada.py` | `parsear_html_portada()`, `_extraer_desde_jsonld_portada()`, `_url_html_permitida()`. |
 | `articulo.py` | `extraer_texto_articulo()`, `_article_body_desde_jsonld()`. |
 | `orquestador.py` | `scrapear_medio()`, `scrapear_todos()`. |
@@ -88,8 +90,8 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `normalizacion.py` | Carga de spaCy, `_normalizar()`, `_tokens_texto()`, `_segmentos_url()`. |
 | `motor.py` | `SCORE_MINIMO`, `clasificar()`, `clasificar_detallado()`. |
 | **`almacenamiento/`** | |
-| `sqlite.py` | Esquema local, `init_db()`, `guardar_noticia()`, `ya_existe()`, `conectar_sqlite()`. |
-| `postgres.py` | `sincronizar()`, `sincronizar_log()`, `actualizar_temas_vacios()`. |
+| `sqlite.py` | Esquema local, `init_db()`, `guardar_noticia()`, `registrar_observacion()`, `ya_existe()`. |
+| `postgres.py` | `sincronizar()`, `sincronizar_log()`, `sincronizar_observaciones()`, `actualizar_temas_vacios()`. |
 | **`agregados/`** | |
 | `wordcloud.py` | Todo el cálculo del agregado textual. No importa nada de `observatorio`. |
 | **`publicacion/`** | |
@@ -161,12 +163,13 @@ flowchart TD
     subgraph runner["GitHub Actions · runner efímero"]
         SCR["recoleccion/<br/>RSS → HTML → JSON-LD"]
         CLA["clasificacion/<br/>score ≥ 2.6 o se descarta"]
-        SQLITE[("almacenamiento/sqlite.py<br/>data/noticias.db · EFÍMERA")]
+        SQLITE[("almacenamiento/sqlite.py<br/>noticias + observaciones<br/>EFÍMERA")]
         LOAD["almacenamiento/postgres.py<br/>psycopg2 · lotes de 200"]
     end
 
     subgraph supa["Supabase · PostgreSQL (estado persistente)"]
-        NOT[("medios.noticias")]
+        NOT[("medios.noticias<br/>altas")]
+        OBS[("medios.observaciones<br/>permanencia")]
         LOG[("medios.scraping_log")]
         VIEW[["public.v_noticias_medios"]]
         WCT[("medios.wordcloud_terms")]
@@ -178,12 +181,13 @@ flowchart TD
     RSS --> SCR
     HTML --> SCR
     SCR --> CLA
-    CLA -->|con tema| SQLITE
-    CLA -.sin tema: descartada.-> X((✗))
+    CLA -->|con tema, con texto| SQLITE
+    CLA -->|sin tema, sin texto| SQLITE
     SQLITE --> LOAD
     LOAD -->|upsert por url_hash| NOT
+    LOAD -->|una fila por pieza y ejecución| OBS
     LOAD --> LOG
-    NOT --> VIEW
+    NOT -->|solo piezas con tema| VIEW
     NOT -->|service_role| WCB
     WCB -->|truncate + upsert| WCT
     VIEW -->|anon key| IDX
@@ -207,9 +211,13 @@ local, en cambio, la SQLite sí persiste entre ejecuciones y actúa como caché.
 
 Estrategia en cascada, de más fiable a más frágil:
 
+0. **API REST de WordPress** (`wp_json.parsear_wp_json`) — cuando la portada
+   mezcla noticias con programación, recetas y avisos corporativos en rutas que
+   ningún filtro separa. Lo usa RTVC, y devuelve fecha de publicación real y las
+   categorías propias del medio.
 1. **RSS** (`rss.parsear_rss`) — doble intento: primero `feedparser` directo con
    cabeceras de navegador, y si falla o devuelve 0 entradas, `httpx` como
-   respaldo. Solo 5 de los 14 medios tienen RSS utilizable.
+   respaldo. 7 de las 17 cabeceras tienen RSS utilizable.
 2. **Portada HTML** (`portada.parsear_html_portada`) — selectores CSS definidos
    por medio en `config/medios.py`, con filtrado de URLs por regex.
 3. **JSON-LD de la portada** (`portada._extraer_desde_jsonld_portada`) — red de
@@ -229,6 +237,14 @@ en `clientes.py`:
   (sirve caché caducada antes de rendirse).
 - `ClientePlaywright` — Chromium headless. Lo usa **un solo medio**:
   `canariasahora`, marcado con `playwright: True` en `config/medios.py`.
+
+**El listado va sin recorte.** La portada se recorre entera: cuesta una sola
+petición y es un objeto finito, justo la unidad que declara el cuaderno
+metodológico. El tope (`max_articulos_por_medio`) está en la descarga de texto
+completo, que sí cuesta una petición por pieza. Antes el recorte estaba al
+revés, y además con cuotas desiguales entre cabeceras (20–30), lo que hacía
+incomparables los volúmenes entre medios. Al quitarlo, Canarias7 pasa de 30
+piezas por ejecución a unas 138, y El Día de 30 a 110.
 
 **Cortesía deliberada**: pausas aleatorias de 1,5–5 s entre peticiones, con un
 12 % de probabilidad de una pausa larga de 8–22 s que imita a un lector humano
@@ -271,9 +287,10 @@ Ejemplos reales del clasificador tras la reestructuración:
 
 **Consecuencia de diseño con peso metodológico**: una noticia sin ningún tema
 por encima del umbral **no se guarda** (`sqlite.guardar_noticia` devuelve
-`False`) y, si ya estaba, se purga (`postgres._purgar_noticias_sin_temas`). El
-corpus no es «la prensa canaria», es «la prensa canaria filtrada por la agenda
-temática de ODESOCAN». Cualquier análisis de volumen debe declararlo.
+`[]`) pero **se guarda igual**: es el denominador, y sin él la saliencia no es
+calculable. Lo que no se hace es gastarle una petición descargando el cuerpo del
+artículo. Quien filtra es la consulta, y la vista pública `v_noticias_medios`,
+que solo expone las piezas con al menos un tema.
 
 El prototipo de cada tema se construye concatenando `label` + `keywords` +
 `EXTRA_THEME_HINTS` y vectorizándolo con `es_core_news_md`
@@ -365,7 +382,8 @@ en local.
 | `fecha_scrap` | TEXT NOT NULL | ISO 8601 UTC |
 | `fuente` | TEXT | `'rss'` o `'html'` |
 | `raw_json` | TEXT | payload original del feed o procedencia del extractor |
-| `temas` | TEXT | array JSON de claves de tema |
+| `temas` | TEXT | array JSON de claves de tema. **Vacío `[]` = pieza fuera de la agenda de ODESOCAN, conservada como denominador** |
+| `seccion` | TEXT | sección propia del medio (etiqueta del feed, categoría de la API o ruta de la URL) |
 
 Índices sobre `medio`, `fecha_pub`, `url_hash`. `PRAGMA journal_mode=WAL`.
 
@@ -373,13 +391,28 @@ en local.
 `status` (`running` | `ok` | `error`). Es la traza de auditoría de cada
 ejecución por medio.
 
+**`observaciones`**: `url_hash`, `medio`, `run_id`, `observado_en`, `posicion`,
+`fuente`, con clave única `(url_hash, run_id)`. Una fila por pieza vista en cada
+ejecución, exista ya o no.
+
+La distinción con `noticias` sostiene la mitad del análisis de agenda:
+`noticias` guarda el **alta**, una fila por URL la primera vez que aparece;
+`observaciones` guarda la **permanencia**. Una pieza que aguanta cinco días en
+portada es más prominente que una que dura dos horas, y antes esa diferencia se
+perdía en la ingesta —el scraper saltaba lo ya visto— sin poder reconstruirla.
+
+`posicion` es el rango dentro de su listado de origen, no entre listados: la
+posición 3 de un feed no es comparable con la posición 3 de una portada. Por eso
+viaja siempre acompañada de `fuente`.
+
 ### 5.2 PostgreSQL / Supabase — proyecto `kdpsjutsgvghdtzoskkg`
 
 | Objeto | Esquema | Origen del DDL | Quién escribe | Quién lee |
 |---|---|---|---|---|
-| `noticias` | `medios` | ⚠️ **no versionado** | `almacenamiento/postgres.py` | vista + pipeline de nube |
-| `scraping_log` | `medios` | ⚠️ **no versionado** | `almacenamiento/postgres.py` | — |
-| `v_noticias_medios` | `public` | ⚠️ **no versionado** | — | `index.html` con la *anon* key |
+| `noticias` | `medios` | ✅ `db/esquema.sql` | `almacenamiento/postgres.py` | vista + pipeline de nube |
+| `scraping_log` | `medios` | ✅ `db/esquema.sql` | `almacenamiento/postgres.py` | — |
+| `observaciones` | `medios` | ✅ `db/esquema.sql` | `almacenamiento/postgres.py` | análisis de permanencia |
+| `v_noticias_medios` | `public` | ✅ `db/esquema.sql` | — | `index.html` con la *anon* key |
 | `wordcloud_terms` | `medios` | ✅ `db/wordcloud.sql` | `agregados/wordcloud.py` (*service_role*) | `index.html` con la *anon* key |
 | `truncate_wordcloud_terms()` | `public` | ✅ `db/wordcloud.sql` | — | solo *service_role* |
 
@@ -420,28 +453,38 @@ más score por ámbito, exigiendo `doc_freq ≥ 2`.
 
 ## 6. Inventario de configuración
 
-### 6.1 Los 14 medios (`config/medios.py`)
+### 6.1 Las 17 cabeceras (`config/medios.py`)
 
-| Clave | Nombre | Tipo | Cuota | Particularidad |
-|---|---|---|---:|---|
-| `canarias7` | Canarias7 | rss+html | 30 | |
-| `laprovincia` | La Provincia | html_only | 30 | RSS da 404; regex de URL por fecha |
-| `eldia` | El Día | html_only | 30 | misma plataforma que La Provincia |
-| `diariodeavisos` | Diario de Avisos | rss+html | 30 | WordPress; migró de Astra a Kadence |
-| `laopinion` | La Opinión de Tenerife | html_only | 25 | el RSS redirige al grupo editorial |
-| `elpueblocanario` | El Pueblo Canario | html_only | 25 | ⚠️ **ECONNREFUSED persistente, 0 noticias históricas** |
-| `canariasnoticias` | Canarias Noticias | html_only | 25 | ⚠️ **ECONNREFUSED persistente, 0 noticias históricas** |
-| `canariasahora` | Canarias Ahora | html_only | 25 | **único medio con Playwright** (renderiza con JS) |
-| `atlanticohoy` | Atlántico Hoy | html_only | 25 | |
-| `eltime` | El Time | html_only | 25 | |
-| `gomeraverde` | Gomera Verde | rss+html | 25 | |
-| `lancelotdigital` | Lancelot Digital | rss+html | 25 | excluye `/component/` |
-| `elhierrohoy` | El Hierro Hoy | rss+html | 20 | excluye taxonomías de WordPress |
-| `lavozdefuerteventura` | La Voz de Fuerteventura | rss+html | 25 | |
+| Clave | Nombre | Tipo | Particularidad |
+|---|---|---|---|
+| `canarias7` | Canarias7 | rss+html | |
+| `laprovincia` | La Provincia | html_only | RSS da 404; regex de URL por fecha |
+| `eldia` | El Día | html_only | misma plataforma que La Provincia |
+| `diariodeavisos` | Diario de Avisos | rss+html | WordPress; migró de Astra a Kadence |
+| `laopinion` | La Opinión de Tenerife | html_only | el RSS redirige al grupo editorial |
+| `elpueblocanario` | El Pueblo Canario | html_only | ⚠️ **ECONNREFUSED persistente, 0 noticias históricas** |
+| `canariasnoticias` | Canarias Noticias | html_only | ⚠️ **ECONNREFUSED persistente, 0 noticias históricas** |
+| `canariasahora` | Canarias Ahora | html_only | **único medio con Playwright** (renderiza con JS) |
+| `atlanticohoy` | Atlántico Hoy | html_only | |
+| `eltime` | El Time | html_only | |
+| `gomeraverde` | Gomera Verde | rss+html | |
+| `lancelotdigital` | Lancelot Digital | rss+html | excluye `/component/` |
+| `elhierrohoy` | El Hierro Hoy | rss+html | excluye taxonomías de WordPress |
+| `lavozdefuerteventura` | La Voz de Fuerteventura | rss+html | |
+| `europapress` | Europa Press Canarias | rss+html | **agencia**; canal RSS 00287, con `pubDate` real |
+| `efe` | EFE Canarias | html_only | **agencia**; los feeds del sitio dan 500. La fecha va en la URL |
+| `rtvc` | RTVC · Radio Televisión Canaria | wp_json | **radiotelevisión pública**; API REST con fecha y categorías reales |
 
-Cada entrada define `nombre`, `color`, `url`, `rss[]`, `tipo`, `max_items`,
+Cada entrada define `nombre`, `color`, `url`, `rss[]`, `tipo` y
 `selectores.{titular,resumen}` y, opcionalmente, `html_url_regex`,
-`html_url_excludes` y `playwright`.
+`html_url_excludes`, `playwright` y `wp_api`. **Ya no hay cuota por medio**: las
+cuotas desiguales hacían incomparables los volúmenes entre cabeceras.
+
+Las agencias y la radiotelevisión pública se añadieron por especificación del
+análisis de agenda inter-medios: en la prensa regional el primero en publicar
+suele ser la agencia, y los diarios reproducen el teletipo. Sin ellas en el
+corpus, un análisis de primicia atribuiría el liderazgo al periódico que antes
+colgó el cable.
 
 ### 6.2 Los 15 temas (`config/temas.py`)
 
@@ -471,7 +514,15 @@ perder cobertura frente a algún falso positivo.
 
 `delay_min` 1,5 s · `delay_max` 5,0 s · `pausa_larga_prob` 0,12 ·
 `pausa_larga_rango` (8, 22) s · `timeout` 15 s · `max_reintentos` 3 ·
-`max_items_por_medio` 50 · `cache_ttl_dias` 7 · `respetar_robots` **False**.
+`max_listado_por_medio` **0 (sin tope)** · `max_articulos_por_medio` 20 ·
+`cache_ttl_dias` 7 · `respetar_robots` **False**.
+
+El `Accept-Encoding` que anuncia el cliente se construye con los descompresores
+realmente instalados (`clientes._codificaciones_soportadas`). Anunciar `br` sin
+tener brotli era un fallo silencioso: httpx devolvía los bytes sin descomprimir,
+el binario superaba el control de longitud mínima y acababa cacheado como si
+fuera HTML, dejando al medio a cero sin ningún error visible. Era lo que tenía a
+EFE Canarias sin extraer una sola pieza.
 
 ---
 
@@ -553,6 +604,8 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 | Cambiar la sensibilidad del clasificador | `SCORE_MINIMO` en `observatorio/clasificacion/motor.py` y los `peso_titulo` de `temas.py` |
 | Un medio dejó de devolver titulares | `selectores` del medio en `config/medios.py`; comprobar si el JSON-LD lo está salvando en el log |
 | Cambiar el ritmo de las peticiones | `observatorio/config/scraping.py` |
+| Cambiar cuántos artículos se descargan al día | `max_articulos_por_medio` en `config/scraping.py` |
+| Añadir un medio con portada inservible pero WordPress | `tipo: "wp_json"` + `wp_api` en `config/medios.py` |
 | Cambiar la cadencia del scraping | `.github/workflows/scraping.yml` → `cron` (y `bin/scraping.py` para el modo daemon) |
 | Limpiar palabras vacías de la nube | `SPANISH_STOPWORDS` en `observatorio/agregados/wordcloud.py` |
 | Cambiar cuántos términos guarda la nube | variable de repositorio `WORDCLOUD_MAX_TERMS` |
@@ -568,72 +621,75 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 Hallazgos de la lectura, ordenados por lo que más afecta a un uso analítico.
 Ninguno impide que el sistema funcione hoy.
 
-1. **El DDL de las tablas principales no está versionado.** `medios.noticias`,
-   `medios.scraping_log` y la vista `public.v_noticias_medios` solo existen
-   dentro del proyecto Supabase. Únicamente `wordcloud_terms` tiene su SQL en
-   `db/`. Si el proyecto se perdiera, el esquema habría que reconstruirlo por
-   ingeniería inversa desde `almacenamiento/postgres.py`. Es la fragilidad más
-   relevante para reproducibilidad, y la que más fácil sería cerrar: bastaría
-   con volcar el DDL actual a `db/noticias.sql`.
+1. **`fecha_pub` no es comparable entre fuentes.** En RSS y en la API de RTVC
+   viene de la fuente; en el raspado de portada se rellena con `datetime.now()`
+   del momento de la captura. Como el dashboard construye el gráfico de
+   actividad horaria sobre `fecha_pub`, para las cabeceras sin feed ese gráfico
+   mide **cuándo se ejecutó el scraper**, no cuándo publicó el medio. Cualquier
+   análisis temporal debe restringirse a `fuente IN ('rss','wp_json')` o usar
+   `fecha_scrap`. Es lo que queda por resolver del cambio R4 del cuaderno.
 
-2. **`fecha_pub` no es comparable entre fuentes.** En RSS viene del feed; en
-   scraping HTML se rellena con `datetime.now()` del momento del raspado
-   (`recoleccion/portada.py`). Como el dashboard construye el gráfico de
-   actividad horaria (`TD`) sobre `fecha_pub`, para los 9 medios sin RSS ese
-   gráfico mide **cuándo se ejecutó el scraper**, no cuándo publicó el medio.
-   Cualquier análisis temporal debería restringirse a `fuente = 'rss'` o usar
-   `fecha_scrap` explícitamente.
+2. **El corpus crece mucho más rápido que antes.** Al quitar el recorte del
+   listado y conservar las piezas sin tema, una cabecera grande pasa de ~30
+   filas por ejecución a más de 100. Con 17 cabeceras son del orden de 1.500
+   filas diarias, frente a las 12.664 acumuladas en toda la vida anterior del
+   proyecto. Hay que vigilar la cuota de almacenamiento de Supabase y decidir
+   una política de retención para `texto_full`, que es lo que ocupa.
 
-3. **El inventario de medios está duplicado y desincronizado.**
-   `config/medios.py` define 14; `index.html` (`LM`, `MEDIO_COLORS`) conoce 12.
-   Faltan `elpueblocanario` y `canariasnoticias` — precisamente los dos con
-   ECONNREFUSED y 0 noticias históricas, así que hoy no se nota. Si volvieran a
-   responder, aparecerían en el dashboard con su clave técnica y un color del
-   fallback. Además, dos colores no coinciden entre ambos ficheros
-   (`gomeraverde`, `lavozdefuerteventura`).
+3. **`index.html` descarga el corpus entero al navegador** en páginas de 1.000
+   filas. La vista ya filtra las piezas sin tema, así que el dashboard no crece
+   con el denominador; pero sí con las cabeceras nuevas y el listado sin
+   recortar. El arreglo natural es mover los agregados a vistas materializadas
+   en Postgres, el mismo patrón que ya usa la nube de palabras.
 
-4. **`index.html` descarga el corpus entero al navegador** en páginas de 1 000
-   filas. Con ~12 700 noticias son 13 peticiones en cada carga. Es sostenible
-   ahora; a 50 000 filas dejará de serlo, y el arreglo natural sería mover los
-   agregados a vistas materializadas en Postgres — el mismo patrón que ya usa la
-   nube de palabras.
+4. **La extracción de texto completo falla en varias cabeceras.** El heurístico
+   de respaldo prueba seis selectores (`article`, `main`, `.content`,
+   `entry-content`…) y hay medios que no usan ninguno: El Hierro Hoy, por
+   ejemplo, devuelve 626 KB de HTML y cero párrafos. Cuando `newspaper3k`
+   tampoco acierta, la pieza queda sin `texto_full`. Conviene medir la cobertura
+   por cabecera antes de cualquier análisis de encuadre.
 
 5. **`publicacion/dashboard.py` es código muerto que se conserva a propósito.**
-   Ya no encuentra el bloque estático que reescribía y devuelve `False`. Está
-   señalizado en el docstring del subpaquete, pero son 200 líneas y una
-   dependencia de `bin/scraping.py`.
+   Ya no encuentra el bloque estático que reescribía y devuelve `False`.
 
 6. **`actualizar_temas_vacios()` no forma parte del pipeline automático.** Solo
-   se ejecuta desde `bin/sincronizar.py`. Si alguna vez entra un registro con
-   `temas IS NULL`, nada lo reclasifica de forma programada.
+   se ejecuta desde `bin/sincronizar.py`.
 
-7. **`config/stopwords.py` no lo importa nadie.** `STOPWORDS_EXTRA` estaba en el
-   `config.py` original sin usarse. La lista que sí surte efecto es
-   `SPANISH_STOPWORDS`, dentro de `agregados/wordcloud.py`. Antes estaba
-   enterrada en un fichero de 697 líneas; ahora es un fichero de 16 que declara
-   su propia inutilidad.
+7. **`config/stopwords.py` no lo importa nadie.** La lista que sí surte efecto
+   es `SPANISH_STOPWORDS`, dentro de `agregados/wordcloud.py`.
 
 8. **Hay dos `_normalizar_temas()` distintas**, en `almacenamiento/postgres.py`
-   y en `publicacion/dashboard.py`. No son equivalentes: la primera trata `"NA"`
-   y `"null"` como vacío, la segunda no. Se han dejado tal cual porque
-   unificarlas cambiaría comportamiento, pero es una divergencia a resolver.
+   y en `publicacion/dashboard.py`, y no son equivalentes: la primera trata
+   `"NA"` y `"null"` como vacío, la segunda no.
 
-9. **`index.html` termina con `</body></html>` duplicado.** Los navegadores lo
-   toleran; es un residuo de edición.
+9. **Carga `supabase-js` por CDN sin usarlo.** Todo el acceso a datos son
+   `fetch` manuales contra PostgREST.
 
-10. **Carga `supabase-js` por CDN sin usarlo.** Todo el acceso a datos son
-    `fetch` manuales contra PostgREST. Es una descarga inútil en cada visita.
+10. **El paso «Commit y push del dashboard» hace `git add index.html data/`**,
+    pero `data/` está íntegramente en `.gitignore`.
 
-11. **El paso «Commit y push del dashboard» hace `git add index.html data/`**,
-    pero `data/` está íntegramente en `.gitignore`. En la práctica ese paso no
-    commitea nada casi nunca, lo cual es coherente con que el dashboard ya no se
-    regenere.
+11. **No hay tests.** Con el código troceado en módulos pequeños y sin efectos
+    secundarios al importar, añadirlos es barato: `clasificacion/` y
+    `agregados/` son funciones puras y se prueban sin red ni base de datos.
 
-12. **No hay tests.** Con el código ya troceado en módulos pequeños y sin
-    efectos secundarios al importar, añadirlos es ahora barato: `clasificacion/`
-    y `agregados/` son funciones puras y se prueban sin red ni base de datos.
+### Resueltas
 
----
+Se dejan anotadas porque el cuaderno metodológico las cita:
+
+- **El denominador.** Las piezas sin tema ya no se eliminan: se guardan con
+  `temas` vacío y la vista pública las filtra. La saliencia relativa a la
+  producción del medio pasa a ser calculable.
+- **Las cuotas desiguales.** El listado ya no se recorta, así que los volúmenes
+  entre cabeceras vuelven a ser comparables.
+- **La permanencia en portada.** La tabla `observaciones` registra cada pieza
+  vista en cada ejecución, no solo su alta.
+- **El esquema sin versionar.** `db/esquema.sql` documenta las tablas
+  principales y la vista pública.
+- **El inventario descuadrado.** `config/medios.py` e `index.html` declaran las
+  mismas 17 cabeceras, con los mismos colores.
+- **El `</body></html>` duplicado** al final de `index.html`.
+- **La compresión brotli anunciada sin soporte**, que dejaba a EFE Canarias sin
+  extraer una sola pieza y envenenaba la caché con binario.
 
 ## 10. Glosario de orientación desde R
 
@@ -693,10 +749,12 @@ temas, así que los totales por tema **suman más** que el número de noticias),
   `publicacion/` e `index.html` lo enseñan.
 - **Dos pipelines independientes** que se cruzan solo en la base de datos: el
   diario, y el de la nube de palabras (`agregados/`, aislado a propósito).
+- **`noticias` guarda el alta; `observaciones`, la permanencia.** Sin la segunda
+  no hay duración de la atención, que es la mitad de la saliencia.
 - **El estado vive fuera**: Supabase es la única pieza persistente; SQLite es un
   búfer efímero y el HTML no guarda nada.
 - **Se importa desde `observatorio/`, se ejecuta desde `bin/`.**
 - **Los fallos son verdes por diseño**: hay que leer los logs, no los iconos.
-- **El corpus está filtrado por tema en origen**: no es una muestra de la prensa
-  canaria, es la prensa canaria proyectada sobre la agenda de ODESOCAN. Decláralo
-  en cualquier análisis.
+- **El corpus ya no está filtrado en origen**: se guarda todo lo que aparece en
+  portada, con `temas` vacío cuando queda fuera de la agenda de ODESOCAN. Ese es
+  el denominador. Quien filtra es la consulta, y la vista pública del dashboard.

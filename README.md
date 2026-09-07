@@ -1,8 +1,23 @@
 # medios-odesocan
 
-Observatorio de medios canarios de ODESOCAN: scraping diario de la prensa
-canaria, clasificación temática y volcado a Supabase, con un dashboard estático
-publicado en GitHub Pages.
+Observatorio de medios canarios de ODESOCAN: scraping diario de 17 cabeceras
+—incluidas dos agencias y la radiotelevisión pública—, clasificación temática y
+volcado a Supabase, con un dashboard estático publicado en GitHub Pages.
+
+> **Antes de la próxima ejecución hay que aplicar `db/esquema.sql`** en el
+> proyecto Supabase. Añade la columna `seccion`, crea la tabla
+> `medios.observaciones` y rehace la vista pública del dashboard. Sin ese paso,
+> el pipeline escribirá contra columnas que no existen.
+
+## Dos tablas, no una
+
+`medios.noticias` guarda el **alta**: una fila por URL, la primera vez que
+aparece. `medios.observaciones` guarda la **permanencia**: una fila por pieza y
+ejecución, mientras siga en portada, con su posición en el listado.
+
+La distinción importa para el análisis de agenda. Una pieza que aguanta cinco
+días en portada es más prominente que una que dura dos horas, y hasta ahora esa
+diferencia se perdía: el scraper saltaba lo que ya había visto.
 
 ## Pipelines
 
@@ -19,11 +34,16 @@ plataforma, no un fallo del repositorio.
 
 `bin/scraping.py --run-now` encadena:
 
-1. `observatorio/recoleccion/` — recorre los medios de `observatorio/config/` (RSS + HTML), extrae los
-   artículos y los guarda en SQLite (`data/noticias.db`, efímero en CI).
-2. `observatorio/clasificacion/` — asigna temas; las noticias sin tema se descartan.
-3. `observatorio/almacenamiento/postgres.py` — sincroniza lo nuevo contra `medios.noticias` en
-   Supabase por conexión Postgres directa (`psycopg2`).
+1. `observatorio/recoleccion/` — recorre las cabeceras de `observatorio/config/`
+   (RSS, portada HTML o API de WordPress) y guarda en SQLite (`data/noticias.db`,
+   efímero en CI). La portada se recorre **entera**: el tope está en la descarga
+   de texto completo, no en el listado.
+2. `observatorio/clasificacion/` — asigna temas. Las piezas sin tema **se
+   conservan** con `temas` vacío: son el denominador de cualquier medida de
+   saliencia. Lo que no se hace es descargarles el cuerpo del artículo.
+3. `observatorio/almacenamiento/postgres.py` — sincroniza lo nuevo contra
+   `medios.noticias` y vuelca `medios.observaciones`, por conexión Postgres
+   directa (`psycopg2`).
 4. `observatorio/publicacion/dashboard.py` — ver más abajo.
 
 Secrets que necesita (ya configurados): `SUPABASE_HOST`, `SUPABASE_PORT`,
@@ -112,14 +132,14 @@ defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
 observatorio/          el paquete, dividido por capas
 ├── config/            qué medios y temas se observan, y con qué parámetros
 ├── comun/             logging y helpers de texto compartidos
-├── recoleccion/       RSS, portadas HTML, artículos y el orquestador
+├── recoleccion/       RSS, portadas HTML, API de WordPress y el orquestador
 ├── clasificacion/     asignación de temas
 ├── almacenamiento/    SQLite local y sincronización con PostgreSQL
 ├── agregados/         nube de palabras (pipeline independiente)
 └── publicacion/       generación del dashboard (legado)
 
 bin/                   puntos de entrada ejecutables
-db/                    esquema SQL versionado
+db/                    esquema SQL versionado (esquema.sql + wordcloud.sql)
 requirements/          dependencias, una por pipeline
 index.html             el dashboard — se queda en la raíz porque es lo que
                        sirve GitHub Pages

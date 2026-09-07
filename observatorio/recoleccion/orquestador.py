@@ -5,17 +5,32 @@ Orquestador del scraping.
 la tabla `scraping_log`. `scrapear_todos()` la aplica a todos los medios,
 aislando el fallo de cada uno para que no tumbe al resto.
 
-El orden importa: se clasifica ANTES de descargar el artículo completo, de modo
-que una noticia fuera de la agenda temática no cuesta ni una petición extra.
+Tres decisiones de diseño con consecuencias metodológicas:
+
+1. Cada pieza vista deja una OBSERVACIÓN en cada ejecución, aunque ya estuviera
+   en la base. La tabla `noticias` registra el alta; `observaciones` registra la
+   permanencia, que es la otra mitad de la saliencia.
+
+2. El listado de portada se recorre ENTERO. El tope está en la descarga de
+   texto completo, que es lo que cuesta una petición por pieza.
+
+3. Las piezas sin tema se guardan igual, con `temas` vacío, pero no se les
+   descarga el cuerpo. Así hay denominador sin gastar tráfico.
 """
 
 import logging
 import sqlite3
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from observatorio.almacenamiento.sqlite import guardar_noticia, init_db, ya_existe
+from observatorio.almacenamiento.sqlite import (
+    guardar_noticia,
+    init_db,
+    registrar_observacion,
+    ya_existe,
+)
 from observatorio.clasificacion.motor import clasificar
 from observatorio.comun.registro import configurar_logging
 from observatorio.config.medios import MEDIOS
@@ -28,8 +43,15 @@ from observatorio.recoleccion.clientes import (
 )
 from observatorio.recoleccion.portada import parsear_html_portada
 from observatorio.recoleccion.rss import parsear_rss
+from observatorio.recoleccion.wp_json import parsear_wp_json
 
 log = logging.getLogger("scraper")
+
+
+def nuevo_run_id() -> str:
+    """Identificador de una tirada completa de scraping."""
+    return f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:6]}"
+
 
 # ── Orquestador principal ─────────────────────────────────────────────────────
 
@@ -39,6 +61,7 @@ def scrapear_medio(
     cliente: ClienteHTTP,
     dry_run: bool = False,
     extraer_articulos: bool = False,
+    run_id: Optional[str] = None,
 ) -> dict:
     """
     Scraping completo de un medio: RSS → HTML → (opcional) texto completo.
@@ -46,25 +69,29 @@ def scrapear_medio(
     """
     cfg = MEDIOS.get(medio_id)
     if not cfg:
-        raise ValueError(f"Medio '{medio_id}' no encontrado en config.py")
+        raise ValueError(f"Medio '{medio_id}' no encontrado en config/medios.py")
 
+    run_id = run_id or nuevo_run_id()
     log.info("━━ Scraping: %s ━━", cfg["nombre"])
     inicio = datetime.now(timezone.utc).isoformat()
-    stats = {"medio": medio_id, "total": 0, "nuevas": 0, "errores": 0}
+    stats = {"medio": medio_id, "total": 0, "nuevas": 0, "observadas": 0,
+             "sin_tema": 0, "con_texto": 0, "errores": 0}
     status = "ok"
 
     # Registrar inicio en log de BD
-    run_id = None
+    run_bd = None
     if not dry_run:
         cur = conn.execute(
             "INSERT INTO scraping_log (medio, inicio) VALUES (?,?)",
             (medio_id, inicio),
         )
         conn.commit()
-        run_id = cur.lastrowid
+        run_bd = cur.lastrowid
 
-    # Cuota de este medio (puede sobreescribir el global de SCRAPER)
-    max_items = cfg.get("max_items") or SCRAPER["max_items_por_medio"]
+    # El listado se recorre entero (0 = sin tope); lo que se limita es la
+    # descarga de artículos, que es lo que cuesta una petición por pieza.
+    max_listado = SCRAPER["max_listado_por_medio"]
+    presupuesto_texto = SCRAPER["max_articulos_por_medio"]
 
     # Cliente HTML: httpx por defecto; Playwright para medios JS-renderizados
     cliente_html: ClienteHTTP | ClientePlaywright = cliente
@@ -87,36 +114,49 @@ def scrapear_medio(
         if cfg["tipo"] in ("rss_only", "rss+html"):
             for feed_url in cfg.get("rss", []):
                 try:
-                    noticias += parsear_rss(medio_id, feed_url, cliente, max_items=max_items)
+                    noticias += parsear_rss(medio_id, feed_url, cliente, max_items=max_listado)
                 except Exception as e:
                     log.error("Error RSS %s: %s", feed_url, e)
                     stats["errores"] += 1
 
         if cfg["tipo"] in ("html_only", "rss+html"):
             try:
-                noticias += parsear_html_portada(medio_id, cfg, cliente_html, max_items=max_items)
+                noticias += parsear_html_portada(medio_id, cfg, cliente_html, max_items=max_listado)
             except Exception as e:
                 log.error("Error HTML %s: %s", cfg["url"], e)
                 stats["errores"] += 1
 
-        # Deduplicar por URL dentro de esta ejecución y aplicar cuota total del medio
+        if cfg["tipo"] == "wp_json":
+            try:
+                noticias += parsear_wp_json(medio_id, cfg, cliente, max_items=max_listado)
+            except Exception as e:
+                log.error("Error wp-json %s: %s", cfg.get("wp_api"), e)
+                stats["errores"] += 1
+
+        # Deduplicar por URL dentro de esta ejecución. Ya NO se recorta el
+        # listado: la portada entera es la unidad de observación.
         vistas = set()
         noticias_unicas = []
         for n in noticias:
             if n["url"] not in vistas:
                 vistas.add(n["url"])
                 noticias_unicas.append(n)
-        noticias_unicas = noticias_unicas[:max_items]
 
         stats["total"] = len(noticias_unicas)
         log.info("  Total noticias únicas: %d", stats["total"])
 
-        # Guardar / extraer texto completo
+        observado_en = datetime.now(timezone.utc).isoformat()
+
         for n in noticias_unicas:
             if dry_run:
                 print(f"  [DRY-RUN] {n['medio']} | {n['titulo'][:70]}")
                 stats["nuevas"] += 1
                 continue
+
+            # La observación se registra SIEMPRE, esté o no la pieza ya en la
+            # base: es lo que mide cuánto aguanta en portada y en qué posición.
+            if registrar_observacion(conn, n, run_id, observado_en):
+                stats["observadas"] += 1
 
             if ya_existe(conn, n["url"]):
                 continue
@@ -126,24 +166,28 @@ def scrapear_medio(
                 n.get("resumen", ""),
                 n.get("url", ""),
             )
-            if not temas:
-                log.info("Noticia descartada sin temas: %s", n["titulo"][:80])
-                continue
-
             n["temas"] = temas
+            if not temas:
+                stats["sin_tema"] += 1
 
-            # Solo descargamos el artículo completo si ya pasó el filtro temático.
-            if extraer_articulos:
+            # El cuerpo solo se descarga para lo que entra en la agenda temática
+            # y mientras quede presupuesto. Lo demás se guarda igual, para que
+            # exista denominador, pero sin gastar una petición.
+            if extraer_articulos and temas and presupuesto_texto > 0:
                 n["texto_full"] = extraer_texto_articulo(n["url"], cliente)
+                presupuesto_texto -= 1
+                if n["texto_full"]:
+                    stats["con_texto"] += 1
 
             if guardar_noticia(conn, n):
                 stats["nuevas"] += 1
-                log.info("  ✓ Nueva: %s", n["titulo"][:60])
+                if temas:
+                    log.info("  ✓ Nueva: %s", n["titulo"][:60])
     except Exception:
         status = "error"
         raise
     finally:
-        if not dry_run and run_id:
+        if not dry_run and run_bd:
             try:
                 conn.execute(
                     """UPDATE scraping_log
@@ -155,7 +199,7 @@ def scrapear_medio(
                         stats["nuevas"],
                         stats["errores"],
                         status,
-                        run_id,
+                        run_bd,
                     ),
                 )
                 conn.commit()
@@ -165,10 +209,9 @@ def scrapear_medio(
             cliente_pw.close()
 
     log.info(
-        "  Resultado: %d nuevas / %d total / %d errores",
-        stats["nuevas"],
-        stats["total"],
-        stats["errores"],
+        "  Resultado: %d nuevas / %d observadas / %d en portada · %d sin tema · %d con texto · %d errores",
+        stats["nuevas"], stats["observadas"], stats["total"],
+        stats["sin_tema"], stats["con_texto"], stats["errores"],
     )
     return stats
 
@@ -183,10 +226,11 @@ def scrapear_todos(
     conn = init_db()
     cliente = ClienteHTTP()
     medios_a_scrapear = medios or list(MEDIOS.keys())
+    run_id = nuevo_run_id()
     resultados = []
     inicio_total = time.time()
 
-    log.info("Iniciando scraping de %d medios", len(medios_a_scrapear))
+    log.info("Iniciando scraping de %d medios · run_id=%s", len(medios_a_scrapear), run_id)
     try:
         for medio_id in medios_a_scrapear:
             if medio_id not in MEDIOS:
@@ -199,6 +243,7 @@ def scrapear_todos(
                     cliente,
                     dry_run=dry_run,
                     extraer_articulos=extraer_articulos,
+                    run_id=run_id,
                 )
                 resultados.append(stats)
             except Exception as e:
@@ -210,6 +255,8 @@ def scrapear_todos(
 
     elapsed = time.time() - inicio_total
     total_nuevas = sum(r.get("nuevas", 0) for r in resultados)
-    log.info("━━ Scraping completado en %.1fs — %d noticias nuevas ━━", elapsed, total_nuevas)
+    total_obs = sum(r.get("observadas", 0) for r in resultados)
+    log.info("━━ Scraping completado en %.1fs — %d nuevas / %d observaciones ━━",
+             elapsed, total_nuevas, total_obs)
 
     return resultados
