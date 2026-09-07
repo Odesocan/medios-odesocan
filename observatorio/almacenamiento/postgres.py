@@ -25,6 +25,7 @@ from psycopg2.extras import Json
 
 from observatorio.almacenamiento.sqlite import conectar_sqlite
 from observatorio.clasificacion.motor import clasificar
+from observatorio.clasificacion.version import version_clasificador
 from observatorio.comun.registro import configurar_logging
 from observatorio.config.credenciales import SUPABASE
 
@@ -75,7 +76,8 @@ def _noticias_sqlite(
     placeholders = ",".join("?" * len(excluir_hashes)) if excluir_hashes else "''"
     query = f"""
         SELECT url, url_hash, medio, titulo, resumen, texto_full,
-               fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion
+               fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
+               clasificador_version
         FROM noticias
         {"WHERE url_hash NOT IN (" + placeholders + ")" if excluir_hashes else ""}
         ORDER BY fecha_scrap ASC
@@ -180,7 +182,8 @@ def sincronizar(
         insert_sql = f"""
             INSERT INTO {schema}.noticias
                 (url, url_hash, medio, titulo, resumen, texto_full,
-                 fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion)
+                 fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
+               clasificador_version)
             VALUES %s
             ON CONFLICT (url_hash) DO NOTHING
         """
@@ -201,6 +204,7 @@ def sincronizar(
                     Json(json.loads(n["raw_json"])) if n.get("raw_json") else None,
                     _temas_para_supabase(n),
                     n.get("seccion"),
+                    n.get("clasificador_version"),
                 )
                 for n in lote
             ]
@@ -260,8 +264,10 @@ def actualizar_temas_vacios() -> int:
                 # Antes, las que seguían sin tema se BORRABAN. Ahora se marcan
                 # con array vacío: siguen contando para el denominador.
                 cur.execute(
-                    f"UPDATE {schema}.noticias SET temas = %s WHERE url_hash = %s",
-                    (temas, fila["url_hash"]),
+                    f"""UPDATE {schema}.noticias
+                        SET temas = %s, clasificador_version = %s
+                        WHERE url_hash = %s""",
+                    (temas, version_clasificador(), fila["url_hash"]),
                 )
                 if temas:
                     actualizados += 1
@@ -388,3 +394,101 @@ def sincronizar_observaciones(limit: Optional[int] = None) -> int:
         pg.close()
 
     return enviadas
+
+
+def reclasificar_corpus(
+    dry_run: bool = False,
+    limit: Optional[int] = None,
+    todas: bool = False,
+) -> dict:
+    """
+    Reetiqueta el corpus con la versión vigente del clasificador.
+
+    Sin esto, cada pieza conserva para siempre la etiqueta que le puso la
+    versión del clasificador vigente el día que se raspó, mientras
+    `config/temas.py` y las pistas siguen evolucionando. Una serie temporal de
+    saliencia construida sobre un corpus así confunde el cambio de agenda con
+    el cambio del instrumento de medida.
+
+    Por defecto solo revisa las piezas cuya huella no coincide con la actual.
+    Con `todas=True` revisa el corpus entero, lo que sirve para sellar por
+    primera vez las piezas anteriores a esta columna.
+
+    `dry_run` calcula la deriva y no escribe: es la forma de medir cuánto
+    cambiaría el corpus antes de decidir si se reclasifica.
+    """
+    configurar_logging("supabase")
+    version = version_clasificador()
+    pg = conectar_supabase()
+    schema = SUPABASE["schema"]
+    stats = {
+        "version": version, "revisadas": 0, "sin_cambio": 0,
+        "ganan_tema": 0, "pierden_tema": 0, "cambian_tema": 0, "actualizadas": 0,
+    }
+
+    try:
+        condicion = "" if todas else (
+            "WHERE clasificador_version IS DISTINCT FROM %(version)s")
+        consulta = f"""
+            SELECT url_hash, titulo, resumen, url, temas
+            FROM {schema}.noticias
+            {condicion}
+            ORDER BY id
+            {"LIMIT " + str(int(limit)) if limit else ""}
+        """
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(consulta, {"version": version})
+            filas = cur.fetchall()
+
+        log.info("Reclasificando %d piezas con la versión %s…", len(filas), version)
+        if not filas:
+            return stats
+
+        pendientes = []
+        for fila in filas:
+            stats["revisadas"] += 1
+            antes = set(fila["temas"] or [])
+            despues_lista = clasificar(
+                fila["titulo"] or "", fila["resumen"] or "", fila["url"] or "")
+            despues = set(despues_lista)
+
+            if antes == despues:
+                stats["sin_cambio"] += 1
+            elif not antes and despues:
+                stats["ganan_tema"] += 1
+            elif antes and not despues:
+                stats["pierden_tema"] += 1
+            else:
+                stats["cambian_tema"] += 1
+
+            pendientes.append((fila["url_hash"], despues_lista, version))
+
+        if dry_run:
+            log.info("[DRY-RUN] No se ha escrito nada.")
+            return stats
+
+        actualizar_sql = f"""
+            UPDATE {schema}.noticias AS n
+            SET temas = v.temas, clasificador_version = v.ver
+            FROM (VALUES %s) AS v(url_hash, temas, ver)
+            WHERE n.url_hash = v.url_hash
+        """
+        lote_size = 500
+        for i in range(0, len(pendientes), lote_size):
+            lote = pendientes[i : i + lote_size]
+            with pg.cursor() as cur:
+                psycopg2.extras.execute_values(
+                    cur, actualizar_sql, lote,
+                    template="(%s::text, %s::text[], %s::text)")
+            pg.commit()
+            stats["actualizadas"] += len(lote)
+            log.info("  ✓ %d/%d selladas", stats["actualizadas"], len(pendientes))
+
+    except Exception as e:
+        pg.rollback()
+        log.error("Error reclasificando el corpus: %s", e, exc_info=True)
+        raise
+    finally:
+        pg.close()
+
+    return stats

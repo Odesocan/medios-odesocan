@@ -8,9 +8,10 @@
 --   1. Documenta `medios.noticias` y `medios.scraping_log`. Son `if not exists`,
 --      así que sobre la base actual no cambian nada: están aquí para cerrar la
 --      laguna de reproducibilidad de tener el esquema solo dentro de Supabase.
---   2. Añade la columna `seccion` a `medios.noticias`.  ← SÍ cambia la base
---   3. Crea `medios.observaciones`.                     ← SÍ cambia la base
---   4. Rehace la vista pública con el filtro temático.  ← SÍ cambia la base
+--   2.  Añade la columna `seccion` a `medios.noticias`.       ← SÍ cambia la base
+--   2b. Añade `clasificador_version` a `medios.noticias`.     ← SÍ cambia la base
+--   3.  Crea `medios.observaciones`.                          ← SÍ cambia la base
+--   4.  Rehace la vista pública con el filtro temático.       ← SÍ cambia la base
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ── 1. Tablas existentes, documentadas ────────────────────────────────────
@@ -31,7 +32,9 @@ create table if not exists medios.noticias (
   fuente      text not null,
   raw_json    jsonb,
   entidades   jsonb,
-  temas       text[]
+  temas       text[],
+  seccion     text,
+  clasificador_version text
 );
 
 create table if not exists medios.scraping_log (
@@ -53,6 +56,29 @@ create table if not exists medios.scraping_log (
 alter table medios.noticias add column if not exists seccion text;
 
 create index if not exists noticias_seccion_idx on medios.noticias (medio, seccion);
+
+-- ── 2b. Versión del clasificador que etiquetó cada pieza ──────────────────
+-- Las piezas se clasifican una sola vez, al raspar, y nunca se reetiquetan,
+-- mientras `config/temas.py` y las pistas van cambiando. Sin esta columna, una
+-- serie temporal de saliencia confunde el cambio de agenda con el cambio del
+-- instrumento de medida.
+--
+-- El valor es una huella de 12 caracteres sobre lo único que determina el
+-- resultado: temas y palabras clave, pistas de refuerzo y de URL, umbral de
+-- decisión y modelo de spaCy cargado. No es el commit de git, que cambiaría con
+-- cualquier modificación ajena al clasificador.
+--
+-- Las filas anteriores a esta columna quedan a NULL. Para sellarlas hay que
+-- ejecutar `bin/reclasificar.py --todas` en un entorno CON el modelo
+-- `es_core_news_md` instalado: sin vectores el clasificador degrada y sellaría
+-- el corpus con una huella que no corresponde a la de producción.
+alter table medios.noticias add column if not exists clasificador_version text;
+
+create index if not exists noticias_clasificador_version_idx
+  on medios.noticias (clasificador_version);
+
+comment on column medios.noticias.clasificador_version is
+'Huella del clasificador que etiquetó la pieza. NULL = anterior a esta columna. Dos piezas con huellas distintas NO son comparables en una serie temporal.';
 
 -- El denominador vive aquí: a partir de ahora `temas` puede ser un array vacío
 -- (pieza vista y clasificada, pero fuera de la agenda temática de ODESOCAN).
@@ -151,6 +177,8 @@ grant select on public.v_noticias_medios to anon, authenticated;
 --    where table_schema='medios' and table_name='noticias'
 --      and column_name='seccion';                                 -- 1 fila
 --   select count(*) from public.v_noticias_medios;                -- = piezas con tema
+--   select clasificador_version, count(*) from medios.noticias
+--    group by 1 order by 2 desc;                                   -- versiones en el corpus
 --
 -- Al aplicarlo, la vista pasará de 13.428 filas a 13.235: las 193 piezas que ya
 -- estaban sin tema dejan de contarse como noticias en el dashboard.

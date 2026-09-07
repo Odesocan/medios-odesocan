@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from observatorio.clasificacion.motor import clasificar
+from observatorio.clasificacion.version import version_clasificador
 from observatorio.comun.texto import url_hash
 from observatorio.config.rutas import DB_PATH
 
@@ -41,7 +42,8 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
             fuente      TEXT    NOT NULL,   -- 'rss' | 'html'
             raw_json    TEXT,               -- payload original del feed
             temas       TEXT,               -- JSON array de temas clasificados
-            seccion     TEXT                -- sección propia del medio (feed o URL)
+            seccion     TEXT,               -- sección propia del medio (feed o URL)
+            clasificador_version TEXT       -- huella del clasificador que la etiquetó
         );
 
         -- Una fila por pieza VISTA en cada ejecución, exista ya o no.
@@ -81,7 +83,8 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_obs_medio  ON observaciones(medio, observado_en);
     """)
     # Migración: añadir columnas nuevas si la BD ya existía sin ellas
-    for col, defn in [("temas", "TEXT"), ("texto_full", "TEXT"), ("seccion", "TEXT")]:
+    for col, defn in [("temas", "TEXT"), ("texto_full", "TEXT"), ("seccion", "TEXT"),
+                      ("clasificador_version", "TEXT")]:
         try:
             conn.execute(f"ALTER TABLE noticias ADD COLUMN {col} {defn}")
             conn.commit()
@@ -107,6 +110,9 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
     `temas` vacío. Sin ella no hay denominador, y la saliencia es por definición
     una magnitud relativa al total de la producción del medio. Filtrar por tema
     es cosa de la consulta, no de la ingesta.
+
+    Se sella además la versión del clasificador que la etiquetó, sin la cual una
+    serie temporal confunde el cambio de agenda con el cambio del instrumento.
     """
     h = url_hash(noticia["url"])
     temas = noticia.get("temas")
@@ -120,8 +126,9 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
         conn.execute(
             """INSERT INTO noticias
                (url, url_hash, medio, titulo, resumen, texto_full,
-                fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                fecha_pub, fecha_scrap, fuente, raw_json, temas, seccion,
+                clasificador_version)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 noticia["url"], h, noticia["medio"],
                 noticia["titulo"], noticia.get("resumen"),
@@ -131,6 +138,7 @@ def guardar_noticia(conn: sqlite3.Connection, noticia: dict) -> bool:
                 json.dumps(noticia.get("raw"), ensure_ascii=False),
                 json.dumps(temas, ensure_ascii=False),
                 noticia.get("seccion"),
+                noticia.get("clasificador_version") or version_clasificador(),
             ),
         )
         conn.commit()

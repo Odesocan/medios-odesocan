@@ -159,6 +159,8 @@ python bin/scraping.py --run-now           # pipeline completo
 python bin/sincronizar.py --dry-run
 python bin/generar_dashboard.py --dry-run
 python bin/construir_wordcloud.py          # requiere SUPABASE_URL y SERVICE_ROLE_KEY
+python bin/reclasificar.py --version       # huella del clasificador actual
+python bin/reclasificar.py --dry-run       # mide la deriva del instrumento
 ```
 
 Los scripts de `bin/` añaden la raíz del repositorio a `sys.path`, así que

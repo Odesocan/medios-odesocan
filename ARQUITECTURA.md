@@ -89,6 +89,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `pistas.py` | `EXTRA_THEME_HINTS` (lenguaje periodístico), `URL_THEME_HINTS` (secciones). |
 | `normalizacion.py` | Carga de spaCy, `_normalizar()`, `_tokens_texto()`, `_segmentos_url()`. |
 | `motor.py` | `SCORE_MINIMO`, `clasificar()`, `clasificar_detallado()`. |
+| `version.py` | `version_clasificador()`: huella de lo que determina la clasificación. |
 | **`almacenamiento/`** | |
 | `sqlite.py` | Esquema local, `init_db()`, `guardar_noticia()`, `registrar_observacion()`, `ya_existe()`. |
 | `postgres.py` | `sincronizar()`, `sincronizar_log()`, `sincronizar_observaciones()`, `actualizar_temas_vacios()`. |
@@ -106,6 +107,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `bin/raspar.py` | Solo el raspado. `--medio`, `--dry-run`, `--lista-medios`. | a mano |
 | `bin/sincronizar.py` | Solo la sincronización. `--limit`, `--dry-run`. Además lanza `actualizar_temas_vacios()`. | a mano |
 | `bin/generar_dashboard.py` | Regeneración del HTML. Legado. | a mano |
+| `bin/reclasificar.py` | Reetiqueta el corpus con la versión vigente del clasificador. | `reclasificar.yml`, a mano |
 
 Cada script de `bin/` añade la raíz del repositorio a `sys.path`, así que
 funciona desde cualquier directorio sin instalar el paquete.
@@ -384,6 +386,7 @@ en local.
 | `raw_json` | TEXT | payload original del feed o procedencia del extractor |
 | `temas` | TEXT | array JSON de claves de tema. **Vacío `[]` = pieza fuera de la agenda de ODESOCAN, conservada como denominador** |
 | `seccion` | TEXT | sección propia del medio (etiqueta del feed, categoría de la API o ruta de la URL) |
+| `clasificador_version` | TEXT | huella del clasificador que la etiquetó. **Piezas con huellas distintas no son comparables en una serie temporal** |
 
 Índices sobre `medio`, `fecha_pub`, `url_hash`. `PRAGMA journal_mode=WAL`.
 
@@ -534,6 +537,13 @@ EFE Canarias sin extraer una sola pieza.
 |---|---|---|---|
 | `scraping.yml` | `0 10 * * *` | `python bin/scraping.py --run-now` | `requirements/pipeline.txt` + Playwright + `es_core_news_md` |
 | `build-wordcloud.yml` | `0 12 * * *` | `python bin/construir_wordcloud.py` | `requirements/wordcloud.txt` (solo `supabase`) |
+| `reclasificar.yml` | solo a mano | `python bin/reclasificar.py` | igual que el scraping, **incluido el modelo de spaCy** |
+
+`reclasificar.yml` existe precisamente por el modelo: la huella del clasificador
+incluye el spaCy cargado, porque sin vectores el motor degrada y clasifica
+distinto. Ejecutar la reclasificación en una máquina sin `es_core_news_md`
+sellaría el corpus con una huella que no es la de producción, que es justo el
+problema que la columna viene a resolver. Por defecto se dispara en seco.
 
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
 puede desplazarse horas. Está documentado en ambos ficheros y en el README como
@@ -601,7 +611,8 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 |---|---|
 | Añadir un medio | `observatorio/config/medios.py` (+ `LM` y `MEDIO_COLORS` en `index.html`) |
 | Añadir o afinar un tema | `observatorio/config/temas.py`; pistas en `observatorio/clasificacion/pistas.py` |
-| Cambiar la sensibilidad del clasificador | `SCORE_MINIMO` en `observatorio/clasificacion/motor.py` y los `peso_titulo` de `temas.py` |
+| Cambiar la sensibilidad del clasificador | `SCORE_MINIMO` en `observatorio/clasificacion/motor.py` y los `peso_titulo` de `temas.py`. **Cambia la huella: reclasifica después** |
+| Reetiquetar el corpus tras tocar los temas | `bin/reclasificar.py`, o el workflow «Reclasificar corpus» |
 | Un medio dejó de devolver titulares | `selectores` del medio en `config/medios.py`; comprobar si el JSON-LD lo está salvando en el log |
 | Cambiar el ritmo de las peticiones | `observatorio/config/scraping.py` |
 | Cambiar cuántos artículos se descargan al día | `max_articulos_por_medio` en `config/scraping.py` |
@@ -654,6 +665,12 @@ Ninguno impide que el sistema funcione hoy.
 
 6. **`actualizar_temas_vacios()` no forma parte del pipeline automático.** Solo
    se ejecuta desde `bin/sincronizar.py`.
+
+7. **El corpus histórico está sin sellar.** Las 13.428 piezas anteriores a la
+   columna `clasificador_version` están a NULL, así que no se sabe con qué
+   versión del clasificador se etiquetaron. El mecanismo para arreglarlo existe
+   —`bin/reclasificar.py --todas`, vía el workflow— pero hay que ejecutarlo. Su
+   modo `--dry-run` mide antes cuánta deriva hay.
 
 7. **`config/stopwords.py` no lo importa nadie.** La lista que sí surte efecto
    es `SPANISH_STOPWORDS`, dentro de `agregados/wordcloud.py`.
