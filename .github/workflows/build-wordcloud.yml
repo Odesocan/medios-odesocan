@@ -42,9 +42,9 @@ jobs:
             echo "listo=true" >> "$GITHUB_OUTPUT"
             echo "### ✅ Prerrequisitos presentes" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Se ejecuta \`scripts/build_wordcloud_terms.py\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Se ejecuta \`bin/construir_wordcloud.py\`." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Si falla contra la base de datos, comprueba que \`supabase/wordcloud.sql\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Si falla contra la base de datos, comprueba que \`db/wordcloud.sql\`" >> "$GITHUB_STEP_SUMMARY"
             echo "esté aplicado: crea la tabla \`medios.wordcloud_terms\` y la función" >> "$GITHUB_STEP_SUMMARY"
             echo "\`public.truncate_wordcloud_terms\`, ambas obligatorias para el script." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -64,7 +64,7 @@ jobs:
             echo "base de datos y necesita saltarse RLS)."
             echo ""
             echo "Además, antes de la primera ejecución real hay que aplicar"
-            echo "\`supabase/wordcloud.sql\` en el proyecto: crea la tabla"
+            echo "\`db/wordcloud.sql\` en el proyecto: crea la tabla"
             echo "\`medios.wordcloud_terms\` y la función \`public.truncate_wordcloud_terms\`."
             echo ""
             echo "El job termina en verde a propósito: sin estas piezas el script no"
@@ -79,7 +79,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.preflight.outputs.listo == 'true'
-        run: pip install -r requirements.txt
+        run: pip install -r requirements/wordcloud.txt
 
       - name: Build wordcloud aggregates
         if: steps.preflight.outputs.listo == 'true'
@@ -92,4 +92,4 @@ jobs:
           SUPABASE_TARGET_TABLE: ${{ vars.SUPABASE_TARGET_TABLE || 'wordcloud_terms' }}
           WORDCLOUD_MAX_TERMS: ${{ vars.WORDCLOUD_MAX_TERMS || '80' }}
           WORDCLOUD_MIN_DOC_FREQ: ${{ vars.WORDCLOUD_MIN_DOC_FREQ || '2' }}
-        run: python scripts/build_wordcloud_terms.py
+        run: python bin/construir_wordcloud.py

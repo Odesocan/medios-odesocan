@@ -2,10 +2,11 @@
 
 Índice de referencia del observatorio de medios canarios de ODESOCAN.
 Escrito para leerse sin conocimiento previo del repositorio: describe qué hace
-cada fichero, cómo circulan los datos, qué vive dentro del repositorio y qué
+cada carpeta, cómo circulan los datos, qué vive dentro del repositorio y qué
 vive fuera (Supabase, GitHub Actions).
 
-Última revisión del código analizado: rama `main`, commit `7426db2`.
+El código está organizado por capas. Las referencias son a **módulo y función**,
+no a números de línea, para que no caduquen al editar.
 
 ---
 
@@ -23,63 +24,128 @@ componente con estado y es externa.
 
 ---
 
-## 2. Mapa de ficheros
+## 2. El árbol, y por qué está así
 
-El repositorio son 15 ficheros versionados. No hay tests, no hay paquete
-instalable, no hay `src/`: todos los módulos Python viven en la raíz y se
-importan entre sí por nombre plano.
+```
+medios-odesocan/
+├── observatorio/           EL PAQUETE — una carpeta por capa del pipeline
+│   ├── config/             qué se observa (medios, temas, parámetros, rutas)
+│   ├── comun/              utilidades transversales (logging, texto)
+│   ├── recoleccion/        de la web a un diccionario Python
+│   ├── clasificacion/      de un diccionario a un conjunto de temas
+│   ├── almacenamiento/     de la memoria a SQLite y de SQLite a PostgreSQL
+│   ├── agregados/          la nube de palabras (pipeline independiente)
+│   └── publicacion/        el dashboard (legado)
+│
+├── bin/                    PUNTOS DE ENTRADA — lo único que se ejecuta
+├── db/                     esquema SQL versionado
+├── requirements/           dependencias, una lista por pipeline
+├── .github/workflows/      los dos crons
+│
+├── index.html              el dashboard (1.319 líneas, autónomo)
+├── README.md               estado operativo y decisiones
+└── ARQUITECTURA.md         este documento
+```
 
-| Fichero | Líneas | Capa | Rol |
-|---|---:|---|---|
-| `config.py` | 697 | Configuración | Única fuente de verdad: 14 medios, 15 temas, parámetros del scraper, credenciales por variable de entorno. Todo lo demás lo importa. |
-| `scraper.py` | 934 | Recolección | Descarga RSS + portadas HTML, extrae artículos, escribe en SQLite. Contiene el esquema de la BD local. |
-| `clasificador.py` | 303 | Clasificación | Asigna temas a cada noticia. Multietiqueta, con umbral de score. |
-| `supabase_loader.py` | 377 | Persistencia | Sincroniza SQLite → PostgreSQL (Supabase) por conexión directa `psycopg2`. |
-| `scheduler.py` | 102 | Orquestación | Encadena las tres fases anteriores. Es el entrypoint del workflow diario. |
-| `generate_dashboard.py` | 230 | Presentación | **Legado funcional.** Inyectaba datos estáticos en `index.html`; hoy no encuentra nada que reescribir y devuelve `False`. |
-| `index.html` | 1 319 | Presentación | Dashboard D3 autónomo. Consulta Supabase por REST desde el navegador. |
-| `scripts/build_wordcloud_terms.py` | 390 | Agregación | Segundo pipeline, independiente: calcula el agregado textual de la nube de palabras. |
-| `supabase/wordcloud.sql` | 96 | Esquema | DDL de `medios.wordcloud_terms`, su RLS y la función de truncado. |
-| `.github/workflows/scraping.yml` | — | Orquestación | Cron diario 10:00 UTC → `scheduler.py --run-now`. |
-| `.github/workflows/build-wordcloud.yml` | — | Orquestación | Cron diario 12:00 UTC → `build_wordcloud_terms.py`. |
-| `requirements-ci.txt` | — | Entorno | Dependencias del pipeline principal (scraping + NLP). |
-| `requirements.txt` | — | Entorno | Solo `supabase==2.15.3`, lo único que necesita el pipeline de la nube. |
-| `README.md` | — | Documentación | Estado operativo, secrets, decisiones de diseño. |
-| `.gitignore` | — | — | Excluye `data/`, `logs/`, `.env`, `.claude/`. |
+Tres decisiones de estructura que conviene entender antes de nada:
 
-### Grafo de importaciones
+**`index.html` se queda en la raíz.** No es desorden: GitHub Pages publica desde
+la raíz de la rama, así que moverlo a una subcarpeta cambiaría la URL del
+dashboard ya publicado. Si algún día se quiere mover, hay que cambiar antes la
+configuración de Pages en *Settings → Pages*.
+
+**`bin/` está separado del paquete.** Un módulo de `observatorio/` se importa;
+un script de `bin/` se ejecuta. Esa frontera es la que permite que
+`observatorio/` no tenga efectos secundarios al importarse y que se pueda
+probar cualquier pieza suelta desde un intérprete.
+
+**`agregados/` no importa nada del resto.** Es deliberado: su workflow instala
+solo `requirements/wordcloud.txt` (el paquete `supabase` y nada más), así que
+un import hacia otra capa rompería ese pipeline en producción.
+
+### El paquete, fichero a fichero
+
+| Módulo | Contenido |
+|---|---|
+| **`config/`** | |
+| `rutas.py` | `BASE_DIR`, `DATA_DIR`, `DB_PATH`, `CACHE_DIR`, `LOG_DIR`. Crea los directorios al importarse. |
+| `medios.py` | `MEDIOS`: las 14 cabeceras, con feeds, selectores CSS y filtros de URL. |
+| `temas.py` | `TEMAS`: los 15 temas con sus diccionarios de keywords y su `peso_titulo`. |
+| `scraping.py` | `SCRAPER` (ritmo, timeouts, cuotas) y `USER_AGENTS` (12 navegadores). |
+| `credenciales.py` | `SUPABASE`: conexión Postgres, todo por variable de entorno. |
+| `stopwords.py` | `STOPWORDS_EXTRA`. **Nadie lo importa** — código muerto, ahora visible. |
+| **`comun/`** | |
+| `registro.py` | `configurar_logging(fichero=None)`. Antes había cuatro copias de esto. |
+| `texto.py` | `url_hash()` (SHA-256 truncado a 16) y `limpiar_html()`. |
+| **`recoleccion/`** | |
+| `clientes.py` | `ClienteHTTP` (httpx + caché + reintentos), `ClientePlaywright` (Chromium), `_esperar()`, `_headers_navegador()`. |
+| `rss.py` | `parsear_rss()`, `_normalizar_fecha()`. |
+| `portada.py` | `parsear_html_portada()`, `_extraer_desde_jsonld_portada()`, `_url_html_permitida()`. |
+| `articulo.py` | `extraer_texto_articulo()`, `_article_body_desde_jsonld()`. |
+| `orquestador.py` | `scrapear_medio()`, `scrapear_todos()`. |
+| **`clasificacion/`** | |
+| `pistas.py` | `EXTRA_THEME_HINTS` (lenguaje periodístico), `URL_THEME_HINTS` (secciones). |
+| `normalizacion.py` | Carga de spaCy, `_normalizar()`, `_tokens_texto()`, `_segmentos_url()`. |
+| `motor.py` | `SCORE_MINIMO`, `clasificar()`, `clasificar_detallado()`. |
+| **`almacenamiento/`** | |
+| `sqlite.py` | Esquema local, `init_db()`, `guardar_noticia()`, `ya_existe()`, `conectar_sqlite()`. |
+| `postgres.py` | `sincronizar()`, `sincronizar_log()`, `actualizar_temas_vacios()`. |
+| **`agregados/`** | |
+| `wordcloud.py` | Todo el cálculo del agregado textual. No importa nada de `observatorio`. |
+| **`publicacion/`** | |
+| `dashboard.py` | `cargar_noticias()`, `construir_datos()`, `generar_html()`. Legado. |
+
+### Los puntos de entrada
+
+| Script | Qué hace | Quién lo llama |
+|---|---|---|
+| `bin/scraping.py` | Pipeline diario completo (raspado → sync → dashboard). Modo `--run-now` o daemon. | `scraping.yml` |
+| `bin/construir_wordcloud.py` | Recalcula `medios.wordcloud_terms`. | `build-wordcloud.yml` |
+| `bin/raspar.py` | Solo el raspado. `--medio`, `--dry-run`, `--lista-medios`. | a mano |
+| `bin/sincronizar.py` | Solo la sincronización. `--limit`, `--dry-run`. Además lanza `actualizar_temas_vacios()`. | a mano |
+| `bin/generar_dashboard.py` | Regeneración del HTML. Legado. | a mano |
+
+Cada script de `bin/` añade la raíz del repositorio a `sys.path`, así que
+funciona desde cualquier directorio sin instalar el paquete.
+
+### Grafo de dependencias
 
 ```mermaid
 graph TD
-    config[config.py]
-    clasif[clasificador.py]
-    scraper[scraper.py]
-    loader[supabase_loader.py]
-    sched[scheduler.py]
-    gendash[generate_dashboard.py]
-    wc[scripts/build_wordcloud_terms.py]
+    subgraph entrypoints["bin/"]
+        BS[scraping.py]
+        BW[construir_wordcloud.py]
+    end
 
-    config --> clasif
-    config --> scraper
-    config --> loader
-    config --> gendash
-    clasif --> scraper
-    clasif --> loader
-    scraper --> sched
-    loader --> sched
-    gendash -.import diferido.-> sched
+    CFG[config/]
+    COM[comun/]
+    REC[recoleccion/]
+    CLA[clasificacion/]
+    ALM[almacenamiento/]
+    AGR[agregados/]
+    PUB[publicacion/]
 
-    wc -.no importa nada del repo.-> wc
+    CFG --> COM
+    CFG --> REC
+    CFG --> CLA
+    CFG --> ALM
+    CFG --> PUB
+    COM --> REC
+    COM --> ALM
+    COM --> PUB
+    CLA --> ALM
+    ALM --> REC
+    REC --> BS
+    ALM --> BS
+    PUB --> BS
+    AGR --> BW
+
+    style AGR fill:#fff3cd,stroke:#856404
 ```
 
-Dos observaciones sobre este grafo:
-
-- **`config.py` es el cuello de botella deliberado.** Añadir un medio o un tema
-  es editar un diccionario, nada más.
-- **`build_wordcloud_terms.py` está aislado.** No importa `config.py` ni
-  `clasificador.py`: se configura íntegramente por variables de entorno y habla
-  con Supabase por su cliente REST, no por `psycopg2`. Es un pipeline paralelo
-  que casualmente vive en el mismo repositorio, no una etapa del principal.
+`agregados/` aparece aislado a propósito (en ámbar): es el pipeline paralelo.
+Las flechas se leen «es importado por»: `config/` no importa a nadie, y todo lo
+demás acaba desembocando en un script de `bin/`.
 
 ---
 
@@ -93,24 +159,21 @@ flowchart TD
     end
 
     subgraph runner["GitHub Actions · runner efímero"]
-        SCR["scraper.py<br/>RSS → HTML → JSON-LD"]
-        SQLITE[("data/noticias.db<br/>SQLite · EFÍMERA")]
-        CLA["clasificador.py<br/>score ≥ 2.6 o se descarta"]
-        LOAD["supabase_loader.py<br/>psycopg2 · lotes de 200"]
+        SCR["recoleccion/<br/>RSS → HTML → JSON-LD"]
+        CLA["clasificacion/<br/>score ≥ 2.6 o se descarta"]
+        SQLITE[("almacenamiento/sqlite.py<br/>data/noticias.db · EFÍMERA")]
+        LOAD["almacenamiento/postgres.py<br/>psycopg2 · lotes de 200"]
     end
 
     subgraph supa["Supabase · PostgreSQL (estado persistente)"]
         NOT[("medios.noticias")]
         LOG[("medios.scraping_log")]
-        VIEW[["public.v_noticias_medios<br/>vista de lectura"]]
+        VIEW[["public.v_noticias_medios"]]
         WCT[("medios.wordcloud_terms")]
     end
 
-    subgraph pages["GitHub Pages"]
-        IDX["index.html<br/>D3 + fetch REST"]
-    end
-
-    WCB["scripts/build_wordcloud_terms.py<br/>tf · log(1+N/df)"]
+    IDX["index.html<br/>D3 + fetch REST"]
+    WCB["agregados/wordcloud.py<br/>tf · log(1+N/df)"]
 
     RSS --> SCR
     HTML --> SCR
@@ -130,115 +193,127 @@ flowchart TD
 ### El punto clave que hay que entender
 
 **SQLite es efímera en producción.** `data/noticias.db` está en `.gitignore` y el
-runner de Actions se destruye al terminar. Es decir: cada ejecución diaria
-arranca con una base local **vacía**, raspa, clasifica, y sincroniza contra
-Supabase preguntando primero qué `url_hash` ya existen allí
-(`supabase_loader.py:75`). La deduplicación real es contra Postgres, no contra
-la base local. En desarrollo local, en cambio, la SQLite sí persiste entre
-ejecuciones y actúa como caché.
+runner de Actions se destruye al terminar. Cada ejecución diaria arranca con una
+base local **vacía**, raspa, clasifica, y sincroniza contra Supabase preguntando
+primero qué `url_hash` ya existen allí (`postgres._hashes_en_supabase`). La
+deduplicación real es contra Postgres, no contra la base local. En desarrollo
+local, en cambio, la SQLite sí persiste entre ejecuciones y actúa como caché.
 
 ---
 
-## 4. Las cuatro capas, en detalle
+## 4. Las capas, en detalle
 
-### 4.1 Recolección — `scraper.py`
+### 4.1 `recoleccion/` — de la web a un diccionario
 
 Estrategia en cascada, de más fiable a más frágil:
 
-1. **RSS** (`parsear_rss`, línea 410) — doble intento: primero `feedparser`
-   directo con cabeceras de navegador, y si falla o devuelve 0 entradas,
-   `httpx` como respaldo. Solo 5 de los 14 medios tienen RSS utilizable.
-2. **Portada HTML** (`parsear_html_portada`, línea 562) — selectores CSS
-   definidos por medio en `config.py`, con filtrado de URLs por regex.
-3. **JSON-LD de la portada** (`_extraer_desde_jsonld_portada`, línea 495) — red
-   de seguridad: si los selectores CSS devuelven menos de la mitad de la cuota,
-   se buscan bloques `ItemList` / `NewsArticle` en los datos estructurados. Esto
-   es lo que salva al scraper cuando un medio cambia de plantilla.
-4. **Texto completo del artículo** (`extraer_texto_articulo`, línea 664) —
-   `articleBody` de JSON-LD → `newspaper3k` → heurística con BeautifulSoup.
-   Solo se descarga **después** de que la noticia haya pasado el filtro
-   temático, para no gastar peticiones en artículos que se van a descartar.
+1. **RSS** (`rss.parsear_rss`) — doble intento: primero `feedparser` directo con
+   cabeceras de navegador, y si falla o devuelve 0 entradas, `httpx` como
+   respaldo. Solo 5 de los 14 medios tienen RSS utilizable.
+2. **Portada HTML** (`portada.parsear_html_portada`) — selectores CSS definidos
+   por medio en `config/medios.py`, con filtrado de URLs por regex.
+3. **JSON-LD de la portada** (`portada._extraer_desde_jsonld_portada`) — red de
+   seguridad: si los selectores CSS devuelven menos de la mitad de la cuota, se
+   buscan bloques `ItemList` / `NewsArticle` en los datos estructurados. Esto es
+   lo que salva al scraper cuando un medio cambia de plantilla.
+4. **Texto completo** (`articulo.extraer_texto_articulo`) — `articleBody` de
+   JSON-LD → `newspaper3k` → heurística con BeautifulSoup. Solo se descarga
+   **después** de que la noticia haya pasado el filtro temático, para no gastar
+   peticiones en artículos que se van a descartar.
 
-**Dos clientes HTTP intercambiables por duck-typing** (ambos exponen `.get(url)`):
+**Dos clientes HTTP intercambiables por duck-typing** (ambos exponen `.get(url)`),
+en `clientes.py`:
 
-- `ClienteHTTP` (línea 222) — `httpx` con caché en disco (`data/html_cache/`,
-  TTL 7 días), reintentos exponenciales, rotación de 12 User-Agents y
-  *stale-if-error* (sirve caché caducada antes de rendirse).
-- `ClientePlaywright` (línea 314) — Chromium headless. Lo usa **un solo medio**:
-  `canariasahora`, que renderiza con JavaScript (`config.py:144`).
+- `ClienteHTTP` — `httpx` con caché en disco (`data/html_cache/`, TTL 7 días),
+  reintentos exponenciales, rotación de 12 User-Agents y *stale-if-error*
+  (sirve caché caducada antes de rendirse).
+- `ClientePlaywright` — Chromium headless. Lo usa **un solo medio**:
+  `canariasahora`, marcado con `playwright: True` en `config/medios.py`.
 
 **Cortesía deliberada**: pausas aleatorias de 1,5–5 s entre peticiones, con un
 12 % de probabilidad de una pausa larga de 8–22 s que imita a un lector humano
-(`_esperar`, línea 154). `robots.txt` está **desactivado** por decisión explícita
-(`config.py:647`): monitoreo académico, una ejecución diaria, menos tráfico que
-un lector real. Es una decisión defendible pero conviene saberla.
+(`clientes._esperar`). `robots.txt` está **desactivado** por decisión explícita
+(`config/scraping.py`, `respetar_robots: False`): monitoreo académico, una
+ejecución diaria, menos tráfico que un lector real. Es defendible, pero conviene
+saberlo.
 
-### 4.2 Clasificación — `clasificador.py`
+### 4.2 `clasificacion/` — de un diccionario a un conjunto de temas
 
 No es un modelo entrenado: es un **sistema de puntuación híbrido con cuatro
 señales**, todas sumando al mismo score por tema.
 
 | Señal | Peso | Dónde |
 |---|---|---|
-| Keyword literal en el título | `peso_titulo` del tema (2–4) | `_score_pista`, línea 186 |
+| Keyword literal en el título | `peso_titulo` del tema (2–4) | `motor._score_pista` |
 | Keyword literal en el resumen | 1,15 | id. |
 | Coincidencia por lemas (spaCy) en vez de literal | × 0,55 (× 0,75 si es multipalabra) | id. |
-| Pistas extra de lenguaje periodístico | `peso_titulo + 0,8` | `EXTRA_THEME_HINTS`, línea 34 |
-| Segmento de URL exacto (`/migraciones/`) | 2,4 | `_score_url`, línea 205 |
+| Pistas extra de lenguaje periodístico | `peso_titulo + 0,8` | `pistas.EXTRA_THEME_HINTS` |
+| Segmento de URL exacto (`/migraciones/`) | 2,4 | `motor._score_url` |
 | Substring en el path de la URL | 1,4 | id. |
-| Similitud vectorial con prototipo del tema | `(sim − 0,64) × 4` si `sim ≥ 0,64` | línea 285 |
-| Bonus por ≥ 2 señales independientes | +0,35 | línea 282 |
+| Similitud vectorial con prototipo del tema | `(sim − 0,64) × 4` si `sim ≥ 0,64` | `motor.clasificar_detallado` |
+| Bonus por ≥ 2 señales independientes | +0,35 | id. |
 
-**Umbral**: `SCORE_MINIMO = 2.6`, rebajado a 2,2 si la URL da una pista fuerte
-(`clasificador.py:292`). Es multietiqueta: una noticia puede quedar en varios
-temas ordenados por score.
+**Umbral**: `SCORE_MINIMO = 2.6`, rebajado a 2,2 si la URL da una pista fuerte.
+Es multietiqueta: una noticia puede quedar en varios temas ordenados por score.
+
+Ejemplos reales del clasificador tras la reestructuración:
+
+```
+"El Gobierno de Canarias aprueba 500 viviendas de alquiler asequible"
+    → vivienda (7.15), politica (3.95)
+"Llega una patera con 47 personas al puerto de Arguineguín"
+    → migracion (6.48)
+"Condena por violencia machista a un vecino de Las Palmas"
+    → violencia_genero (5.00), justicia (3.00)
+"El Betis gana 2-1 al Sevilla en el derbi"
+    → (descartada: ningún tema llega al umbral)
+```
 
 **Consecuencia de diseño con peso metodológico**: una noticia sin ningún tema
-por encima del umbral **no se guarda** (`scraper.py:119`, `guardar_noticia`
-devuelve `False`) y, si ya estaba, se purga (`_purgar_noticias_sin_temas`,
-`supabase_loader.py:131`). El corpus no es «la prensa canaria», es «la prensa
-canaria filtrada por la agenda temática de ODESOCAN». Cualquier análisis de
-volumen debe declararlo.
+por encima del umbral **no se guarda** (`sqlite.guardar_noticia` devuelve
+`False`) y, si ya estaba, se purga (`postgres._purgar_noticias_sin_temas`). El
+corpus no es «la prensa canaria», es «la prensa canaria filtrada por la agenda
+temática de ODESOCAN». Cualquier análisis de volumen debe declararlo.
 
 El prototipo de cada tema se construye concatenando `label` + `keywords` +
 `EXTRA_THEME_HINTS` y vectorizándolo con `es_core_news_md`
-(`_doc_prototipo`, línea 226). Si spaCy no está o no tiene vectores, esa señal
-simplemente no suma y el clasificador degrada a keywords + URL.
+(`motor._doc_prototipo`). Si spaCy no está o no tiene vectores, esa señal
+simplemente no suma y el clasificador degrada a keywords + URL sin fallar.
 
-### 4.3 Persistencia — `supabase_loader.py`
+### 4.3 `almacenamiento/` — SQLite y PostgreSQL
 
 ```
 SQLite local ──► lee url_hash ya presentes en Postgres ──► envía solo lo nuevo
                  (lotes de 200, ON CONFLICT (url_hash) DO NOTHING)
 ```
 
-Tres funciones públicas:
+`postgres.py` expone tres operaciones:
 
-- `sincronizar()` (línea 154) — el volcado principal. Devuelve
+- `sincronizar()` — el volcado principal. Devuelve
   `{total_locales, eliminadas, pendientes, insertadas, errores}`.
-- `sincronizar_log()` (línea 300) — copia `scraping_log` con `status = 'ok'`,
-  deduplicando por timestamp de inicio truncado a segundos.
-- `actualizar_temas_vacios()` (línea 256) — reclasifica en Postgres los
-  registros con `temas IS NULL` y borra los que sigan sin tema. **No se invoca
-  desde `scheduler.py`**: solo desde la CLI (`python supabase_loader.py`).
+- `sincronizar_log()` — copia `scraping_log` con `status = 'ok'`, deduplicando
+  por timestamp de inicio truncado a segundos.
+- `actualizar_temas_vacios()` — reclasifica en Postgres los registros con
+  `temas IS NULL` y borra los que sigan sin tema. **No se invoca desde
+  `bin/scraping.py`**: solo desde `bin/sincronizar.py`.
 
 La conexión es **Postgres directo con `psycopg2`**, no el cliente REST de
 Supabase. Va contra el *pooler* (`aws-1-eu-west-1.pooler.supabase.com:5432`).
 
-### 4.4 Presentación — `index.html`
+### 4.4 `index.html` — el dashboard
 
 Un único fichero de 1 319 líneas, sin build step. Dependencias por CDN: D3 7.8.5
 y el cliente `supabase-js` (cargado pero, en la práctica, no usado: todo el
 acceso a datos son `fetch` a mano contra PostgREST).
 
-**Arranque** (línea 1296): `fetchNoticias()` → `buildAggregates()` →
-`buildDynamicUI()` → `redraw()`.
+**Arranque**: `fetchNoticias()` → `buildAggregates()` → `buildDynamicUI()` →
+`redraw()`.
 
-- `fetchNoticias()` (línea 644) pagina la vista `v_noticias_medios` de 1 000 en
-  1 000 y descarga **todas** las noticias al navegador.
-- `buildAggregates()` (línea 670) calcula en cliente los cinco arrays que
-  alimentan los gráficos: `NW` (noticias), `MM` (por medio), `TM` (por tema),
-  `HM` (matriz medio × tema), `TD` (actividad horaria).
+- `fetchNoticias()` pagina la vista `v_noticias_medios` de 1 000 en 1 000 y
+  descarga **todas** las noticias al navegador.
+- `buildAggregates()` calcula en cliente los cinco arrays que alimentan los
+  gráficos: `NW` (noticias), `MM` (por medio), `TM` (por tema), `HM` (matriz
+  medio × tema), `TD` (actividad horaria).
 - Todos los filtros son **client-side**: no hay una segunda petición al cambiar
   de medio o de tema.
 
@@ -246,25 +321,25 @@ acceso a datos son `fetch` a mano contra PostgREST).
 
 | Función | Gráfico | Interacción |
 |---|---|---|
-| `drawB()` línea 846 | Barras por medio | Clic filtra por medio |
-| `drawL()` línea 872 | Líneas de actividad horaria | — |
-| `drawT()` línea 902 | Barras por tema | Clic filtra por tema |
-| `drawH()` línea 931 | Heatmap medio × tema | Clic filtra por ambos |
-| `drawWC()` línea 1105 | Nube de palabras | — |
-| `drawTB()` línea 1198 | Tabla paginada (8/página) | — |
+| `drawB()` | Barras por medio | Clic filtra por medio |
+| `drawL()` | Líneas de actividad horaria | — |
+| `drawT()` | Barras por tema | Clic filtra por tema |
+| `drawH()` | Heatmap medio × tema | Clic filtra por ambos |
+| `drawWC()` | Nube de palabras | — |
+| `drawTB()` | Tabla paginada (8/página) | — |
 
 **La nube de palabras es la excepción arquitectónica.** Es el único componente
 que no se calcula sobre los datos ya descargados: pide bajo demanda el ámbito
-correspondiente a `medios.wordcloud_terms` (`fetchWordcloudTerms`, línea 1060),
-lo cachea en `WC_TERMS.cache`, y si la petición falla o el ámbito está vacío
-recae en un cálculo en cliente sobre los titulares (`wcDesdeTitulares`, línea
-1081) indicándolo en el subtítulo de la tarjeta. Razón: el agregado pondera el
-**artículo completo**, que no viaja al navegador; los titulares sí.
+correspondiente a `medios.wordcloud_terms` (`fetchWordcloudTerms`), lo cachea en
+`WC_TERMS.cache`, y si la petición falla o el ámbito está vacío recae en un
+cálculo en cliente sobre los titulares (`wcDesdeTitulares`) indicándolo en el
+subtítulo de la tarjeta. Razón: el agregado pondera el **artículo completo**,
+que no viaja al navegador; los titulares sí.
 
 El `scope_key` que pide se deriva de los filtros activos y coincide exactamente
-con el que genera el pipeline Python (`wcScopeKey` línea 1051 ↔ `make_scope_key`
-línea 256 de `build_wordcloud_terms.py`). Son dos implementaciones de la misma
-convención en dos lenguajes: **si se cambia una, hay que cambiar la otra**.
+con el que genera el pipeline Python (`wcScopeKey` en `index.html` ↔
+`make_scope_key` en `agregados/wordcloud.py`). Son dos implementaciones de la
+misma convención en dos lenguajes: **si se cambia una, hay que cambiar la otra**.
 
 ---
 
@@ -272,7 +347,8 @@ convención en dos lenguajes: **si se cambia una, hay que cambiar la otra**.
 
 ### 5.1 SQLite local — `data/noticias.db`
 
-Definida en `scraper.py:57` (`init_db`). Efímera en CI, persistente en local.
+Definida en `almacenamiento/sqlite.py` (`init_db`). Efímera en CI, persistente
+en local.
 
 **`noticias`**
 
@@ -281,7 +357,7 @@ Definida en `scraper.py:57` (`init_db`). Efímera en CI, persistente en local.
 | `id` | INTEGER PK | autoincremental |
 | `url` | TEXT UNIQUE | |
 | `url_hash` | TEXT UNIQUE | SHA-256 de la URL, truncado a 16 caracteres |
-| `medio` | TEXT | clave de `MEDIOS` en `config.py` |
+| `medio` | TEXT | clave de `MEDIOS` en `config/medios.py` |
 | `titulo` | TEXT NOT NULL | |
 | `resumen` | TEXT | máx. 800 caracteres |
 | `texto_full` | TEXT | máx. 5 000 caracteres |
@@ -301,18 +377,18 @@ ejecución por medio.
 
 | Objeto | Esquema | Origen del DDL | Quién escribe | Quién lee |
 |---|---|---|---|---|
-| `noticias` | `medios` | ⚠️ **no versionado** | `supabase_loader.py` (usuario Postgres) | vista + pipeline de nube |
-| `scraping_log` | `medios` | ⚠️ **no versionado** | `supabase_loader.py` | — |
+| `noticias` | `medios` | ⚠️ **no versionado** | `almacenamiento/postgres.py` | vista + pipeline de nube |
+| `scraping_log` | `medios` | ⚠️ **no versionado** | `almacenamiento/postgres.py` | — |
 | `v_noticias_medios` | `public` | ⚠️ **no versionado** | — | `index.html` con la *anon* key |
-| `wordcloud_terms` | `medios` | ✅ `supabase/wordcloud.sql` | `build_wordcloud_terms.py` (*service_role*) | `index.html` con la *anon* key |
-| `truncate_wordcloud_terms()` | `public` | ✅ `supabase/wordcloud.sql` | — | solo *service_role* |
+| `wordcloud_terms` | `medios` | ✅ `db/wordcloud.sql` | `agregados/wordcloud.py` (*service_role*) | `index.html` con la *anon* key |
+| `truncate_wordcloud_terms()` | `public` | ✅ `db/wordcloud.sql` | — | solo *service_role* |
 
 **`medios.wordcloud_terms`** — clave primaria compuesta
 `(scope_key, gram_type, normalized_term)`; columnas `medio`, `tema`, `term`,
 `score`, `doc_freq`, `term_freq`, `sample_titles` (jsonb, hasta 3 titulares de
 ejemplo), `n_noticias`, `generated_at`.
 
-**Cuatro ámbitos precalculados** (`scope_keys`, línea 245):
+**Cuatro ámbitos precalculados** (`wordcloud.scope_keys`):
 
 | `scope_key` | Significado |
 |---|---|
@@ -323,10 +399,10 @@ ejemplo), `n_noticias`, `generated_at`.
 
 **Cálculo del score**: `tf · log(1 + N/df)` donde `tf` pondera el campo de
 origen — `titulo` ×3, `resumen` ×2, `texto_full` ×1 — y los bigramas reciben un
-×1,15 adicional (`weighted_terms`, línea 231). Se conservan los 80 términos con
+×1,15 adicional (`wordcloud.weighted_terms`). Se conservan los 80 términos con
 más score por ámbito, exigiendo `doc_freq ≥ 2`.
 
-**Notas de seguridad que el propio SQL documenta** (`supabase/wordcloud.sql`):
+**Notas de seguridad que el propio SQL documenta** (`db/wordcloud.sql`):
 
 - La *anon* key está en `index.html`, en un repositorio público. Es su función
   —es una clave pública—, pero implica que todo lo que `anon` pueda hacer, lo
@@ -344,7 +420,7 @@ más score por ámbito, exigiendo `doc_freq ≥ 2`.
 
 ## 6. Inventario de configuración
 
-### 6.1 Los 14 medios (`config.py:28`)
+### 6.1 Los 14 medios (`config/medios.py`)
 
 | Clave | Nombre | Tipo | Cuota | Particularidad |
 |---|---|---|---:|---|
@@ -367,7 +443,7 @@ Cada entrada define `nombre`, `color`, `url`, `rss[]`, `tipo`, `max_items`,
 `selectores.{titular,resumen}` y, opcionalmente, `html_url_regex`,
 `html_url_excludes` y `playwright`.
 
-### 6.2 Los 15 temas (`config.py:281`)
+### 6.2 Los 15 temas (`config/temas.py`)
 
 | Clave | Etiqueta | Keywords | `peso_titulo` |
 |---|---|---:|---:|
@@ -391,7 +467,7 @@ Cada entrada define `nombre`, `color`, `url`, `rss[]`, `tipo`, `max_items`,
 keyword en el título ya supera el umbral de 2,6: son temas donde se prioriza no
 perder cobertura frente a algún falso positivo.
 
-### 6.3 Parámetros del scraper (`config.py:631`)
+### 6.3 Parámetros del scraper (`config/scraping.py`)
 
 `delay_min` 1,5 s · `delay_max` 5,0 s · `pausa_larga_prob` 0,12 ·
 `pausa_larga_rango` (8, 22) s · `timeout` 15 s · `max_reintentos` 3 ·
@@ -405,8 +481,8 @@ perder cobertura frente a algún falso positivo.
 
 | Workflow | Cron (UTC) | Ejecuta | Dependencias |
 |---|---|---|---|
-| `scraping.yml` | `0 10 * * *` | `python scheduler.py --run-now` | `requirements-ci.txt` + Playwright + `es_core_news_md` |
-| `build-wordcloud.yml` | `0 12 * * *` | `python scripts/build_wordcloud_terms.py` | `requirements.txt` (solo `supabase`) |
+| `scraping.yml` | `0 10 * * *` | `python bin/scraping.py --run-now` | `requirements/pipeline.txt` + Playwright + `es_core_news_md` |
+| `build-wordcloud.yml` | `0 12 * * *` | `python bin/construir_wordcloud.py` | `requirements/wordcloud.txt` (solo `supabase`) |
 
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
 puede desplazarse horas. Está documentado en ambos ficheros y en el README como
@@ -431,10 +507,9 @@ comportamiento de plataforma, no como fallo.
 
 Es lo más importante que hay que saber para operar esto, y es contraintuitivo:
 
-- **`scheduler.py` captura las excepciones de cada fase y las registra sin
-  propagarlas** (líneas 50, 60, 73). Un fallo de sincronización con Supabase
-  **no** pone el workflow en rojo. Si algo va mal se ve en el log del job, nunca
-  en el aspa de Actions.
+- **`bin/scraping.py` captura las excepciones de cada fase y las registra sin
+  propagarlas.** Un fallo de sincronización con Supabase **no** pone el workflow
+  en rojo. Si algo va mal se ve en el log del job, nunca en el aspa de Actions.
 - **`build-wordcloud.yml` comprueba los secrets antes de ejecutar** y, si
   faltan, omite el paso y termina en verde explicando el motivo en el resumen
   del job (`GITHUB_STEP_SUMMARY`), en lugar de fallar a diario.
@@ -448,33 +523,43 @@ solo dato**. Para verificar hay que mirar el log del job, o contar filas en
 ### 7.4 Ejecución local
 
 ```bash
-pip install -r requirements-ci.txt
+pip install -r requirements/pipeline.txt
 python -m spacy download es_core_news_md
 
-python scraper.py --lista-medios          # inventario de medios configurados
-python scraper.py -m canarias7 --dry-run  # un medio, sin escribir en BD
-python scheduler.py --run-now             # pipeline completo
-python supabase_loader.py --dry-run       # ver qué se enviaría
-python generate_dashboard.py --dry-run
-python scripts/build_wordcloud_terms.py   # requiere SUPABASE_URL y SERVICE_ROLE_KEY
+python bin/raspar.py --lista-medios        # inventario de medios configurados
+python bin/raspar.py -m canarias7 --dry-run
+python bin/scraping.py --run-now           # pipeline completo
+python bin/sincronizar.py --dry-run
+python bin/generar_dashboard.py --dry-run
+python bin/construir_wordcloud.py          # requiere SUPABASE_URL y SERVICE_ROLE_KEY
+```
+
+Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
+
+```python
+>>> from observatorio.clasificacion.motor import clasificar_detallado
+>>> clasificar_detallado("El Gobierno aprueba 500 viviendas de alquiler")
+{'vivienda': 7.15, 'politica': 3.95}
 ```
 
 ---
 
 ## 8. Dónde tocar según qué se quiera cambiar
 
-| Objetivo | Fichero y sitio |
+| Objetivo | Fichero |
 |---|---|
-| Añadir un medio | `config.py` → diccionario `MEDIOS` (+ `LM` y `MEDIO_COLORS` en `index.html`) |
-| Añadir o afinar un tema | `config.py` → `TEMAS`; pistas extra en `clasificador.py:34`; pistas de URL en `clasificador.py:102` |
-| Cambiar la sensibilidad del clasificador | `clasificador.py:30` (`SCORE_MINIMO`) y los `peso_titulo` de `config.py` |
-| Un medio dejó de devolver titulares | `selectores` del medio en `config.py`; comprobar si el JSON-LD lo está salvando en el log |
-| Cambiar la cadencia del scraping | `.github/workflows/scraping.yml` → `cron` (y `scheduler.py:95` para el modo daemon) |
-| Limpiar palabras vacías de la nube | `SPANISH_STOPWORDS` en `scripts/build_wordcloud_terms.py:62` |
+| Añadir un medio | `observatorio/config/medios.py` (+ `LM` y `MEDIO_COLORS` en `index.html`) |
+| Añadir o afinar un tema | `observatorio/config/temas.py`; pistas en `observatorio/clasificacion/pistas.py` |
+| Cambiar la sensibilidad del clasificador | `SCORE_MINIMO` en `observatorio/clasificacion/motor.py` y los `peso_titulo` de `temas.py` |
+| Un medio dejó de devolver titulares | `selectores` del medio en `config/medios.py`; comprobar si el JSON-LD lo está salvando en el log |
+| Cambiar el ritmo de las peticiones | `observatorio/config/scraping.py` |
+| Cambiar la cadencia del scraping | `.github/workflows/scraping.yml` → `cron` (y `bin/scraping.py` para el modo daemon) |
+| Limpiar palabras vacías de la nube | `SPANISH_STOPWORDS` en `observatorio/agregados/wordcloud.py` |
 | Cambiar cuántos términos guarda la nube | variable de repositorio `WORDCLOUD_MAX_TERMS` |
 | Modificar un gráfico | la función `drawX()` correspondiente en `index.html` (tabla del §4.4) |
-| Cambiar la paleta | `MEDIO_COLORS` / `TEMA_COLORS` en `index.html:590` **y** `config.py` (están duplicadas) |
-| Añadir una columna a la nube | `supabase/wordcloud.sql` + `build_aggregates()` + `fetchWordcloudTerms()` |
+| Cambiar la paleta | `MEDIO_COLORS` / `TEMA_COLORS` en `index.html` **y** `config/medios.py` (están duplicadas) |
+| Añadir una columna a la nube | `db/wordcloud.sql` + `wordcloud.build_aggregates()` + `fetchWordcloudTerms()` |
+| Cambiar dónde se guardan datos y logs | `observatorio/config/rutas.py` |
 
 ---
 
@@ -485,22 +570,23 @@ Ninguno impide que el sistema funcione hoy.
 
 1. **El DDL de las tablas principales no está versionado.** `medios.noticias`,
    `medios.scraping_log` y la vista `public.v_noticias_medios` solo existen
-   dentro del proyecto Supabase. Únicamente `wordcloud_terms` tiene su SQL en el
-   repositorio. Si el proyecto se perdiera, el esquema habría que reconstruirlo
-   por ingeniería inversa desde `supabase_loader.py`. Es la fragilidad más
-   relevante para reproducibilidad.
+   dentro del proyecto Supabase. Únicamente `wordcloud_terms` tiene su SQL en
+   `db/`. Si el proyecto se perdiera, el esquema habría que reconstruirlo por
+   ingeniería inversa desde `almacenamiento/postgres.py`. Es la fragilidad más
+   relevante para reproducibilidad, y la que más fácil sería cerrar: bastaría
+   con volcar el DDL actual a `db/noticias.sql`.
 
 2. **`fecha_pub` no es comparable entre fuentes.** En RSS viene del feed; en
    scraping HTML se rellena con `datetime.now()` del momento del raspado
-   (`scraper.py:624` y `:532`). Como el dashboard construye el gráfico de
+   (`recoleccion/portada.py`). Como el dashboard construye el gráfico de
    actividad horaria (`TD`) sobre `fecha_pub`, para los 9 medios sin RSS ese
    gráfico mide **cuándo se ejecutó el scraper**, no cuándo publicó el medio.
    Cualquier análisis temporal debería restringirse a `fuente = 'rss'` o usar
    `fecha_scrap` explícitamente.
 
-3. **El inventario de medios está duplicado y desincronizado.** `config.py`
-   define 14; `index.html` (`LM`, `MEDIO_COLORS`) conoce 12. Faltan
-   `elpueblocanario` y `canariasnoticias` — precisamente los dos con
+3. **El inventario de medios está duplicado y desincronizado.**
+   `config/medios.py` define 14; `index.html` (`LM`, `MEDIO_COLORS`) conoce 12.
+   Faltan `elpueblocanario` y `canariasnoticias` — precisamente los dos con
    ECONNREFUSED y 0 noticias históricas, así que hoy no se nota. Si volvieran a
    responder, aparecerían en el dashboard con su clave técnica y un color del
    fallback. Además, dos colores no coinciden entre ambos ficheros
@@ -512,25 +598,40 @@ Ninguno impide que el sistema funcione hoy.
    agregados a vistas materializadas en Postgres — el mismo patrón que ya usa la
    nube de palabras.
 
-5. **`generate_dashboard.py` es código muerto que se conserva a propósito.** El
-   README lo explica: ya no encuentra el bloque estático que reescribía y
-   devuelve `False`. Está bien señalizado, pero son 230 líneas y una dependencia
-   de `scheduler.py` que pueden confundir a quien llegue nuevo.
+5. **`publicacion/dashboard.py` es código muerto que se conserva a propósito.**
+   Ya no encuentra el bloque estático que reescribía y devuelve `False`. Está
+   señalizado en el docstring del subpaquete, pero son 200 líneas y una
+   dependencia de `bin/scraping.py`.
 
 6. **`actualizar_temas_vacios()` no forma parte del pipeline automático.** Solo
-   se ejecuta desde la CLI. Si alguna vez entra un registro con `temas IS NULL`,
-   nada lo reclasifica de forma programada.
+   se ejecuta desde `bin/sincronizar.py`. Si alguna vez entra un registro con
+   `temas IS NULL`, nada lo reclasifica de forma programada.
 
-7. **`index.html` termina con `</body></html>` duplicado** (líneas 1317-1319).
-   Los navegadores lo toleran; es un residuo de edición.
+7. **`config/stopwords.py` no lo importa nadie.** `STOPWORDS_EXTRA` estaba en el
+   `config.py` original sin usarse. La lista que sí surte efecto es
+   `SPANISH_STOPWORDS`, dentro de `agregados/wordcloud.py`. Antes estaba
+   enterrada en un fichero de 697 líneas; ahora es un fichero de 16 que declara
+   su propia inutilidad.
 
-8. **Carga `supabase-js` por CDN sin usarlo.** Todo el acceso a datos son
-   `fetch` manuales contra PostgREST. Es una descarga inútil en cada visita.
+8. **Hay dos `_normalizar_temas()` distintas**, en `almacenamiento/postgres.py`
+   y en `publicacion/dashboard.py`. No son equivalentes: la primera trata `"NA"`
+   y `"null"` como vacío, la segunda no. Se han dejado tal cual porque
+   unificarlas cambiaría comportamiento, pero es una divergencia a resolver.
 
-9. **El paso «Commit y push del dashboard» hace `git add index.html data/`**,
-   pero `data/` está íntegramente en `.gitignore`. En la práctica ese paso no
-   commitea nada casi nunca, lo cual es coherente con que el dashboard ya no se
-   regenere.
+9. **`index.html` termina con `</body></html>` duplicado.** Los navegadores lo
+   toleran; es un residuo de edición.
+
+10. **Carga `supabase-js` por CDN sin usarlo.** Todo el acceso a datos son
+    `fetch` manuales contra PostgREST. Es una descarga inútil en cada visita.
+
+11. **El paso «Commit y push del dashboard» hace `git add index.html data/`**,
+    pero `data/` está íntegramente en `.gitignore`. En la práctica ese paso no
+    commitea nada casi nunca, lo cual es coherente con que el dashboard ya no se
+    regenere.
+
+12. **No hay tests.** Con el código ya troceado en módulos pequeños y sin
+    efectos secundarios al importar, añadirlos es ahora barato: `clasificacion/`
+    y `agregados/` son funciones puras y se prueban sin red ni base de datos.
 
 ---
 
@@ -540,7 +641,8 @@ Equivalencias aproximadas para leer el código sin fricción.
 
 | Aquí (Python / SQL / JS) | Equivalente mental en R |
 |---|---|
-| `config.py` con diccionarios `MEDIOS` / `TEMAS` | un `config.yml` o una `list()` con nombres en un script de constantes |
+| Un paquete con subcarpetas y `__init__.py` | un paquete de R con `R/` y `NAMESPACE` |
+| `from observatorio.config import MEDIOS` | `pkg::MEDIOS`, o un `source("R/config.R")` |
 | `dict` | `list()` con nombres, o un entorno |
 | `defaultdict(int)` / `Counter` | `table()`, o `tapply` acumulando |
 | `dataclass NewsItem` | una fila de `data.frame` con clase propia (`vctrs::new_rcrd`) |
@@ -555,7 +657,7 @@ Equivalencias aproximadas para leer el código sin fricción.
 | GitHub Actions cron | `cronR` o un `targets` pipeline programado |
 
 **Para consultar los datos directamente desde R** (mismo *pooler* que usa
-`supabase_loader.py`, credenciales en `.Renviron`):
+`almacenamiento/postgres.py`, credenciales en `.Renviron`):
 
 ```r
 con <- DBI::dbConnect(
@@ -586,12 +688,14 @@ temas, así que los totales por tema **suman más** que el número de noticias),
 
 ## 11. Resumen para tenerlo en la cabeza
 
-- **Un repositorio, dos pipelines independientes** que se cruzan solo en la base
-  de datos.
+- **Una carpeta por capa**: `config/` decide qué se observa, `recoleccion/` lo
+  trae, `clasificacion/` lo etiqueta, `almacenamiento/` lo guarda,
+  `publicacion/` e `index.html` lo enseñan.
+- **Dos pipelines independientes** que se cruzan solo en la base de datos: el
+  diario, y el de la nube de palabras (`agregados/`, aislado a propósito).
 - **El estado vive fuera**: Supabase es la única pieza persistente; SQLite es un
   búfer efímero y el HTML no guarda nada.
-- **`config.py` gobierna la recolección; `wordcloud.sql` gobierna el agregado
-  textual; el resto es plomería.**
+- **Se importa desde `observatorio/`, se ejecuta desde `bin/`.**
 - **Los fallos son verdes por diseño**: hay que leer los logs, no los iconos.
 - **El corpus está filtrado por tema en origen**: no es una muestra de la prensa
   canaria, es la prensa canaria proyectada sobre la agenda de ODESOCAN. Decláralo

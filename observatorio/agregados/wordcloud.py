@@ -2,6 +2,15 @@
 """
 Construye agregados de word cloud a partir de noticias almacenadas en Supabase.
 
+Pondera el texto por campo de origen (titulo x3, resumen x2, texto_full x1),
+calcula unigramas y bigramas, y puntúa cada término con tf * log(1 + N/df).
+Se conservan los 80 términos con más score por ámbito.
+
+CUIDADO: el `scope_key` que se genera aquí (`make_scope_key`) tiene que coincidir
+exactamente con el que construye `wcScopeKey()` en `index.html`. Son dos
+implementaciones de la misma convención en dos lenguajes: si cambias una,
+cambia la otra.
+
 Fuente esperada por fila (columnas reales de medios.noticias):
 - id
 - medio
@@ -378,13 +387,3 @@ def main() -> int:
         f"{len(aggregates)} filas agregadas."
     )
     return 0
-
-
-if __name__ == "__main__":
-    # Un fallo de configuración es un mensaje de una línea, no un traceback:
-    # el traceback no aporta nada cuando lo que falta es un secret.
-    try:
-        raise SystemExit(main())
-    except RuntimeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1) from None

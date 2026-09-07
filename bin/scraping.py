@@ -1,14 +1,18 @@
 """
-scheduler.py — Ejecuta scraping + sync de forma periódica, sin iniciar el dashboard.
+scraping.py — Punto de entrada del pipeline diario completo.
+
+Encadena las cuatro fases: raspado → clasificación → sync con Supabase →
+regeneración del dashboard. Es lo que ejecuta `.github/workflows/scraping.yml`.
 
 Dos modos:
-  1. Modo daemon (recomendado para desarrollo/VPS sin cron):
-       python scheduler.py
+  1. Ejecución única (la que usa GitHub Actions):
+       python bin/scraping.py --run-now
 
-  2. Modo cron (recomendado para producción en Linux/macOS):
-       Añade a crontab:  crontab -e
-       # Cada día a las 10:00
-       0 10 * * * /usr/bin/python3 /ruta/canarias_monitor/scheduler.py >> /ruta/logs/cron.log 2>&1
+  2. Modo daemon (desarrollo o VPS sin cron):
+       python bin/scraping.py
+
+  3. Modo cron (producción en Linux/macOS), añadiendo a `crontab -e`:
+       0 10 * * * /usr/bin/python3 /ruta/medios-odesocan/bin/scraping.py --run-now >> /ruta/logs/cron.log 2>&1
 
 CRON CHEATSHEET para este proyecto:
   Cada hora:             0 * * * *
@@ -19,26 +23,25 @@ CRON CHEATSHEET para este proyecto:
   Lunes a viernes 7am:   0 7 * * 1-5
 """
 
+import sys
+from pathlib import Path
+
+# Permite ejecutar este script desde cualquier directorio: añade la raíz del
+# repositorio a sys.path para que `import observatorio` funcione sin instalar
+# el paquete.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import argparse
 import logging
 import time
 
 import schedule
 
-from scraper import scrapear_todos
-from supabase_loader import sincronizar, sincronizar_log
+from observatorio.almacenamiento.postgres import sincronizar, sincronizar_log
+from observatorio.comun.registro import configurar_logging
+from observatorio.recoleccion.orquestador import scrapear_todos
 
 log = logging.getLogger("scheduler")
-
-
-def configurar_logging() -> None:
-    if logging.getLogger().handlers:
-        return
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
-
 
 def job() -> None:
     configurar_logging()
@@ -65,7 +68,7 @@ def job() -> None:
     # habitual es que no haya nada que reescribir. Se registra el resultado real
     # para no dar por bueno un paso que no ha hecho nada.
     try:
-        from generate_dashboard import main as generar_dashboard
+        from observatorio.publicacion.dashboard import main as generar_dashboard
         if generar_dashboard():
             log.info("✓ Dashboard D3 regenerado")
         else:

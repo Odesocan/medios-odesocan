@@ -1,7 +1,7 @@
-# requirements-ci.txt — Dependencias para GitHub Actions (sin dashboard interactivo)
-# requirements.txt ya no instala un dashboard Dash: desde que se eliminó
+# requirements/pipeline.txt — Dependencias del pipeline diario (scraping + NLP + sync).
+# requirements/wordcloud.txt no instala un dashboard Dash: desde que se eliminó
 # dashboard.py (2026-03-24) solo contiene el cliente `supabase`, usado por
-# scripts/build_wordcloud_terms.py.
+# observatorio/agregados/wordcloud.py.
 # Última revisión: abril 2026 (comentario corregido en mantenimiento automático 2026-08-05)
 
 # ── Scraping ──────────────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: requirements-ci.txt
+          cache-dependency-path: requirements/pipeline.txt
  
       - name: Instalar dependencias del sistema
         run: |
@@ -54,7 +54,7 @@ jobs:
       - name: Instalar dependencias Python
         run: |
           pip install --upgrade pip
-          pip install -r requirements-ci.txt
+          pip install -r requirements/pipeline.txt
  
       # FIX: Se eliminó la versión fija playwright==1.44.0
       # La v1.44.0 no es compatible con Ubuntu Noble (24.04) porque intenta
@@ -69,7 +69,7 @@ jobs:
         run: python -m spacy download es_core_news_md
  
       - name: Ejecutar scraping + sync + dashboard
-        run: python scheduler.py --run-now
+        run: python bin/scraping.py --run-now
  
       - name: Commit y push del dashboard actualizado
         run: |

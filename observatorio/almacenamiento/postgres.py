@@ -1,42 +1,34 @@
 """
-supabase_loader.py — Sincroniza noticias desde SQLite local → Supabase (schema medios).
+Sincronización SQLite → PostgreSQL (Supabase).
 
-Uso:
-    python supabase_loader.py              # Sincroniza todo lo pendiente
-    python supabase_loader.py --limit 500  # Máximo de registros por ejecución
-    python supabase_loader.py --dry-run    # Muestra qué se enviaría sin escribir
+Conexión Postgres directa con psycopg2 contra el pooler, NO el cliente REST de
+Supabase (ese solo lo usa el pipeline de la nube de palabras).
+
+Tres operaciones:
+
+    sincronizar()             vuelca lo nuevo, en lotes de 200, upsert por url_hash
+    sincronizar_log()         copia la traza de ejecuciones
+    actualizar_temas_vacios() reclasifica en Postgres lo que quedó sin tema
+
+La tercera NO forma parte del pipeline automático: solo se lanza desde
+`bin/sincronizar.py`.
 """
 
-import argparse
 import json
 import logging
 import sqlite3
-from datetime import datetime
 from typing import Optional
 
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import Json
 
-from clasificador import clasificar
-from config import DB_PATH, LOG_DIR, SUPABASE
+from observatorio.almacenamiento.sqlite import conectar_sqlite
+from observatorio.clasificacion.motor import clasificar
+from observatorio.comun.registro import configurar_logging
+from observatorio.config.credenciales import SUPABASE
 
-log = logging.getLogger("supabase_loader")
-
-
-def configurar_logging() -> None:
-    """Configura logging por defecto si la aplicación aún no lo hizo."""
-    if logging.getLogger().handlers:
-        return
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(LOG_DIR / f"supabase_{datetime.now():%Y%m%d}.log"),
-        ],
-    )
-
+log = logging.getLogger("postgres")
 
 # ── Conexiones ────────────────────────────────────────────────────────────────
 
@@ -61,12 +53,6 @@ def conectar_supabase() -> psycopg2.extensions.connection:
     )
     conn.autocommit = False
     log.info("Conexión a Supabase establecida")
-    return conn
-
-
-def conectar_sqlite() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
     return conn
 
 
@@ -159,7 +145,7 @@ def sincronizar(
     Lee noticias de SQLite y las inserta en Supabase (upsert por url_hash).
     Devuelve estadísticas: total_locales, pendientes, insertadas, errores.
     """
-    configurar_logging()
+    configurar_logging("supabase")
     sq = conectar_sqlite()
     pg = conectar_supabase()
     schema = SUPABASE["schema"]
@@ -255,7 +241,7 @@ def sincronizar(
 
 def actualizar_temas_vacios() -> int:
     """Reclasifica en Supabase los registros sin temas y elimina los no clasificables."""
-    configurar_logging()
+    configurar_logging("supabase")
     pg = conectar_supabase()
     schema = SUPABASE["schema"]
     actualizados = 0
@@ -302,7 +288,7 @@ def sincronizar_log(run_stats: list[dict]) -> None:
     Copia el scraping_log de SQLite a Supabase.
     Solo inserta las entradas con status='ok' aún no presentes.
     """
-    configurar_logging()
+    configurar_logging("supabase")
     sq = conectar_sqlite()
     pg = conectar_supabase()
     schema = SUPABASE["schema"]
@@ -347,31 +333,3 @@ def sincronizar_log(run_stats: list[dict]) -> None:
     finally:
         sq.close()
         pg.close()
-
-
-# ── CLI ───────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    configurar_logging()
-    parser = argparse.ArgumentParser(description="Sincroniza SQLite → Supabase (schema medios)")
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=None,
-        help="Máximo de noticias a enviar por ejecución",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Muestra pendientes sin escribir en Supabase",
-    )
-    args = parser.parse_args()
-
-    stats = sincronizar(dry_run=args.dry_run, limit=args.limit)
-    if not args.dry_run:
-        sincronizar_log([])
-        actualizar_temas_vacios()
-
-    print("\nResumen:")
-    for k, v in stats.items():
-        print(f"  {k}: {v}")

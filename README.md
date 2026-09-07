@@ -17,20 +17,20 @@ plataforma, no un fallo del repositorio.
 
 ### 1. Scraping diario
 
-`scheduler.py --run-now` encadena:
+`bin/scraping.py --run-now` encadena:
 
-1. `scraper.py` — recorre los medios de `config.py` (RSS + HTML), extrae los
+1. `observatorio/recoleccion/` — recorre los medios de `observatorio/config/` (RSS + HTML), extrae los
    artículos y los guarda en SQLite (`data/noticias.db`, efímero en CI).
-2. `clasificador.py` — asigna temas; las noticias sin tema se descartan.
-3. `supabase_loader.py` — sincroniza lo nuevo contra `medios.noticias` en
+2. `observatorio/clasificacion/` — asigna temas; las noticias sin tema se descartan.
+3. `observatorio/almacenamiento/postgres.py` — sincroniza lo nuevo contra `medios.noticias` en
    Supabase por conexión Postgres directa (`psycopg2`).
-4. `generate_dashboard.py` — ver más abajo.
+4. `observatorio/publicacion/dashboard.py` — ver más abajo.
 
 Secrets que necesita (ya configurados): `SUPABASE_HOST`, `SUPABASE_PORT`,
 `SUPABASE_DBNAME`, `SUPABASE_USER`, `SUPABASE_PASSWORD`, `SUPABASE_SSLMODE`,
 `SUPABASE_SCHEMA`.
 
-`scheduler.py` captura las excepciones de cada fase y las registra sin
+`bin/scraping.py` captura las excepciones de cada fase y las registra sin
 propagarlas: un fallo de sincronización **no** pone el workflow en rojo. Si algo
 va mal, se ve en el log del job, no en el aspa roja.
 
@@ -49,7 +49,7 @@ responde o no tiene filas para el ámbito activo, la tarjeta recurre al cálculo
 en cliente sobre los titulares y lo indica en su subtítulo, de modo que sigue
 mostrando algo aunque el pipeline se rompa.
 
-Por eso `generate_dashboard.py`, que inyectaba un bloque estático
+Por eso `observatorio/publicacion/dashboard.py`, que inyectaba un bloque estático
 `const MM=[…] … const NW=[…];` en el HTML, ya no tiene nada que reescribir: ese
 bloque desapareció del fichero. El script lo detecta y lo registra como «sin
 cambios» en lugar de dar un éxito que no ha ocurrido. Se mantiene por si se
@@ -57,7 +57,7 @@ vuelve a un dashboard con datos embebidos.
 
 ### 3. Word cloud agregada
 
-`scripts/build_wordcloud_terms.py` calcula un agregado textual ponderado
+`observatorio/agregados/wordcloud.py` calcula un agregado textual ponderado
 (`titulo` ×3, `resumen` ×2, `contenido_limpio` ×1; unigramas y bigramas;
 `score = tf · log(1 + N/df)`) y lo escribe en `medios.wordcloud_terms`, con
 cuatro ejes de agrupación:
@@ -74,7 +74,7 @@ filas en 200 ámbitos sobre 12.664 noticias.
    añadidos. Se configuran en *Settings → Secrets and variables → Actions*.
    La segunda debe ser la *service_role* key (el script escribe en la base de
    datos y necesita saltarse RLS), nunca la *anon* key.
-2. **Esquema en Supabase** — `supabase/wordcloud.sql` aplicado. Crea
+2. **Esquema en Supabase** — `db/wordcloud.sql` aplicado. Crea
    `medios.wordcloud_terms` con RLS y lectura pública, su índice, la función
    `public.truncate_wordcloud_terms` restringida a `service_role`, y los grants
    de `service_role` sobre el esquema `medios`, que no existían.
@@ -106,15 +106,44 @@ defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
 (`wordcloud_terms`), `WORDCLOUD_MAX_TERMS` (`80`), `WORDCLOUD_MIN_DOC_FREQ`
 (`2`).
 
+## Estructura del repositorio
+
+```
+observatorio/          el paquete, dividido por capas
+├── config/            qué medios y temas se observan, y con qué parámetros
+├── comun/             logging y helpers de texto compartidos
+├── recoleccion/       RSS, portadas HTML, artículos y el orquestador
+├── clasificacion/     asignación de temas
+├── almacenamiento/    SQLite local y sincronización con PostgreSQL
+├── agregados/         nube de palabras (pipeline independiente)
+└── publicacion/       generación del dashboard (legado)
+
+bin/                   puntos de entrada ejecutables
+db/                    esquema SQL versionado
+requirements/          dependencias, una por pipeline
+index.html             el dashboard — se queda en la raíz porque es lo que
+                       sirve GitHub Pages
+```
+
+`ARQUITECTURA.md` explica cada pieza en detalle.
+
 ## Desarrollo local
 
 ```bash
-pip install -r requirements-ci.txt
+pip install -r requirements/pipeline.txt
 python -m spacy download es_core_news_md
-python scheduler.py --run-now      # scraping + sync + dashboard
-python generate_dashboard.py --dry-run
+
+python bin/raspar.py --lista-medios        # inventario de medios configurados
+python bin/raspar.py -m canarias7 --dry-run
+python bin/scraping.py --run-now           # pipeline completo
+python bin/sincronizar.py --dry-run
+python bin/generar_dashboard.py --dry-run
+python bin/construir_wordcloud.py          # requiere SUPABASE_URL y SERVICE_ROLE_KEY
 ```
 
-`requirements.txt` solo contiene el cliente `supabase`, que es lo único que
-necesita `scripts/build_wordcloud_terms.py`. El resto del pipeline usa
-`requirements-ci.txt`.
+Los scripts de `bin/` añaden la raíz del repositorio a `sys.path`, así que
+funcionan sin instalar el paquete y desde cualquier directorio.
+
+`requirements/wordcloud.txt` solo contiene el cliente `supabase`, que es lo único
+que necesita `observatorio/agregados/wordcloud.py`. El resto del pipeline usa
+`requirements/pipeline.txt`.

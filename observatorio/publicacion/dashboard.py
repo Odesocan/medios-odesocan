@@ -1,13 +1,8 @@
 """
-generate_dashboard.py — Regenera el HTML del dashboard D3 con datos frescos de la BD local.
-
-Uso:
-    python generate_dashboard.py              # Sobreescribe el HTML original
-    python generate_dashboard.py --dry-run    # Muestra estadísticas sin escribir
-    python generate_dashboard.py --output /ruta/output.html
+Regeneración del dashboard D3 con datos de la BD local. LEGADO: ver el
+docstring de `observatorio/publicacion/__init__.py`.
 """
 
-import argparse
 import json
 import logging
 import re
@@ -16,23 +11,16 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from config import BASE_DIR, DB_PATH, MEDIOS, TEMAS
+from observatorio.comun.registro import configurar_logging
+from observatorio.config.medios import MEDIOS
+from observatorio.config.rutas import BASE_DIR, DB_PATH
+from observatorio.config.temas import TEMAS
 
 log = logging.getLogger("generate_dashboard")
 
 DASHBOARD_HTML = BASE_DIR / "index.html"
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _configurar_logging() -> None:
-    if logging.getLogger().handlers:
-        return
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
-
 
 def _normalizar_temas(raw) -> list[str]:
     if not raw:
@@ -211,20 +199,10 @@ def generar_html(datos: dict, output: Path, dry_run: bool = False) -> bool:
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 def main(output: Path | None = None, dry_run: bool = False) -> bool:
-    _configurar_logging()
+    configurar_logging()
     out = output or DASHBOARD_HTML
     log.info("Cargando noticias desde BD…")
     noticias = cargar_noticias()
     log.info("%d noticias en BD", len(noticias))
     datos = construir_datos(noticias)
     return generar_html(datos, out, dry_run=dry_run)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Regenera el dashboard D3 con datos frescos")
-    parser.add_argument("--output", type=Path, default=None,
-                        help="Ruta de salida (por defecto sobreescribe el original)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Muestra estadísticas sin escribir nada")
-    args = parser.parse_args()
-    main(output=args.output, dry_run=args.dry_run)
