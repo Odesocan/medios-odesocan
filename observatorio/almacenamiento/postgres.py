@@ -278,7 +278,7 @@ def actualizar_temas_vacios() -> int:
     sin_tema = 0
     try:
         with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(f"SELECT url_hash, titulo, resumen FROM {schema}.noticias WHERE temas IS NULL")
+            cur.execute(f"SELECT url_hash, titulo, resumen, url FROM {schema}.noticias WHERE temas IS NULL")
             filas = cur.fetchall()
 
         if not filas:
@@ -288,7 +288,7 @@ def actualizar_temas_vacios() -> int:
         log.info("Reclasificando %d registros sin temas…", len(filas))
         with pg.cursor() as cur:
             for fila in filas:
-                temas = clasificar(fila["titulo"] or "", fila["resumen"] or "")
+                temas = clasificar(fila["titulo"] or "", fila["resumen"] or "", fila["url"] or "")
                 # Antes, las que seguían sin tema se BORRABAN. Ahora se marcan
                 # con array vacío: siguen contando para el denominador.
                 cur.execute(

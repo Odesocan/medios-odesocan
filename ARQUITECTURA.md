@@ -74,6 +74,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `temas.py` | `TEMAS`: los 15 temas con sus diccionarios de keywords y su `peso_titulo`. |
 | `scraping.py` | `SCRAPER` (ritmo, timeouts, cuotas) y `USER_AGENTS` (12 navegadores). |
 | `credenciales.py` | `SUPABASE`: conexión Postgres, todo por variable de entorno. |
+| `secciones.py` | `SECCIONES_EXCLUIDAS` y `TEMAS_VETADOS_POR_SECCION`: qué contenido no entra en la agenda. |
 | `stopwords.py` | `STOPWORDS_EXTRA`. **Nadie lo importa** — código muerto, ahora visible. |
 | **`comun/`** | |
 | `registro.py` | `configurar_logging(fichero=None)`. Antes había cuatro copias de esto. |
@@ -91,6 +92,7 @@ un import hacia otra capa rompería ese pipeline en producción.
 | `normalizacion.py` | Carga de spaCy, `_normalizar()`, `_tokens_texto()`, `_segmentos_url()`. |
 | `motor.py` | `SCORE_MINIMO`, `clasificar()`, `clasificar_detallado()`. |
 | `version.py` | `version_clasificador()`: huella de lo que determina la clasificación. |
+| — | El filtro de secciones vive en `config/secciones.py` y lo aplica `motor.clasificar()`. |
 | **`almacenamiento/`** | |
 | `sqlite.py` | Esquema local, `init_db()`, `guardar_noticia()`, `registrar_observacion()`, `ya_existe()`. |
 | `postgres.py` | `sincronizar()`, `sincronizar_log()`, `sincronizar_observaciones()`, `actualizar_temas_vacios()`. |
@@ -276,6 +278,24 @@ señales**, todas sumando al mismo score por tema.
 
 **Umbral**: `SCORE_MINIMO = 2.6`, rebajado a 2,2 si la URL da una pista fuerte.
 Es multietiqueta: una noticia puede quedar en varios temas ordenados por score.
+
+**Filtro de secciones** (`config/secciones.py`). El clasificador puntúa sobre
+titular, entradilla y URL, y eso genera falsos positivos sistemáticos: un
+fichaje deportivo se etiqueta como `economia` por las cifras del traspaso, y un
+torneo de pesca llegó a etiquetarse como `violencia_genero` por la palabra
+«igualdad». Hay dos mecanismos:
+
+- `SECCIONES_EXCLUIDAS` — secciones donde nada pertenece a la agenda (deportes,
+  gente, televisión, recetas…). Sus piezas **se guardan igual**, como
+  denominador, pero sin temas.
+- `TEMAS_VETADOS_POR_SECCION` — secciones que sí publican materia relevante pero
+  generan un ruido concreto. `sucesos` es el caso: contiene la violencia de
+  género y casi toda la justicia, así que excluirla en bloque destruiría esa
+  cobertura; lo que se veta ahí es `economia` y `turismo`.
+
+El filtro está dentro de `clasificar()` y no en el scraper, para que lo respeten
+por igual la ingesta y la reclasificación: si viviera fuera, reclasificar
+devolvería las etiquetas retiradas. Y entra en la huella del clasificador.
 
 Ejemplos reales del clasificador tras la reestructuración:
 
@@ -636,6 +656,7 @@ Para trastear con una pieza suelta desde el intérprete, sin ejecutar nada:
 |---|---|
 | Añadir un medio | `observatorio/config/medios.py` (+ `LM` y `MEDIO_COLORS` en `index.html`) |
 | Añadir o afinar un tema | `observatorio/config/temas.py`; pistas en `observatorio/clasificacion/pistas.py` |
+| Excluir una sección de la agenda temática | `SECCIONES_EXCLUIDAS` en `observatorio/config/secciones.py`. **Cambia la huella: reclasifica después** |
 | Cambiar la sensibilidad del clasificador | `SCORE_MINIMO` en `observatorio/clasificacion/motor.py` y los `peso_titulo` de `temas.py`. **Cambia la huella: reclasifica después** |
 | Reetiquetar el corpus tras tocar los temas | `bin/reclasificar.py`, o el workflow «Reclasificar corpus» |
 | Un medio dejó de devolver titulares | `selectores` del medio en `config/medios.py`; comprobar si el JSON-LD lo está salvando en el log |

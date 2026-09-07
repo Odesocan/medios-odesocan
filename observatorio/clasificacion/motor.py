@@ -20,6 +20,8 @@ from observatorio.clasificacion.normalizacion import (
     _tokens_texto,
 )
 from observatorio.clasificacion.pistas import EXTRA_THEME_HINTS, URL_THEME_HINTS
+from observatorio.comun.texto import seccion_desde_url
+from observatorio.config.secciones import seccion_excluida, temas_vetados
 from observatorio.config.temas import TEMAS
 
 from functools import lru_cache
@@ -80,6 +82,9 @@ def _doc_prototipo(theme_id: str):
 def clasificar_detallado(titulo: str, resumen: str = "", url: str = "") -> dict[str, float]:
     """
     Devuelve los scores por tema. Sirve para depuración o ajustes del clasificador.
+
+    OJO: no aplica el filtro de secciones. Devuelve la puntuación en bruto, que
+    es lo que interesa al depurar. Quien decide es `clasificar()`.
     """
     titulo_norm = _normalizar(titulo)
     resumen_norm = _normalizar(resumen or "")
@@ -143,6 +148,19 @@ def clasificar_detallado(titulo: str, resumen: str = "", url: str = "") -> dict[
 
 def clasificar(titulo: str, resumen: str = "", url: str = "") -> list[str]:
     """
-    Devuelve lista de claves de tema ordenadas por relevancia.
+    Temas de la pieza, ordenados por relevancia, tras el filtro de secciones.
+
+    El filtro está aquí y no en el scraper para que lo respeten por igual la
+    ingesta y la reclasificación del corpus: si viviera fuera, reclasificar
+    devolvería las etiquetas que el filtro había quitado.
+
+    Una pieza de una sección excluida no se descarta: se queda sin temas, y
+    sigue contando como denominador.
     """
-    return list(clasificar_detallado(titulo, resumen=resumen, url=url))
+    seccion = seccion_desde_url(url)
+    if seccion_excluida(seccion):
+        return []
+
+    temas = list(clasificar_detallado(titulo, resumen=resumen, url=url))
+    vetados = temas_vetados(seccion)
+    return [t for t in temas if t not in vetados] if vetados else temas

@@ -15,6 +15,7 @@ huella se calcula sobre lo único que determina el resultado:
     · los temas y sus palabras clave      (config/temas.py)
     · las pistas de refuerzo y de URL     (clasificacion/pistas.py)
     · el umbral de decisión               (motor.SCORE_MINIMO)
+    · el filtro de secciones              (config/secciones.py)
     · el modelo de spaCy realmente cargado, o su ausencia
 
 Dos piezas con la misma huella son comparables por construcción. El modelo
@@ -30,6 +31,7 @@ from functools import lru_cache
 
 from observatorio.clasificacion import motor, normalizacion
 from observatorio.clasificacion.pistas import EXTRA_THEME_HINTS, URL_THEME_HINTS
+from observatorio.config.secciones import SECCIONES_EXCLUIDAS, TEMAS_VETADOS_POR_SECCION
 from observatorio.config.temas import TEMAS
 
 
@@ -62,6 +64,8 @@ def componentes_version() -> dict:
         # escalar en el momento del import y la huella dejaría de seguir al
         # umbral real si alguien lo cambia en caliente.
         "score_minimo": motor.SCORE_MINIMO,
+        "secciones_excluidas": sorted(SECCIONES_EXCLUIDAS),
+        "temas_vetados": {k: sorted(v) for k, v in sorted(TEMAS_VETADOS_POR_SECCION.items())},
         "modelo": modelo_activo(),
     }
 
