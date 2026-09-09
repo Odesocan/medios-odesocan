@@ -1,0 +1,134 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Detector de declaraciones — ODESOCAN
+#
+# Recorre las noticias que el scraping diario deja en Supabase y extrae las
+# declaraciones de cargos públicos a `medios.declaraciones`, en estado
+# `pendiente`. No emite veredictos: el trabajo de verificación es humano y
+# ocurre sobre la cola que deja este job.
+#
+# El upsert sólo manda columnas de detección, así que reprocesar el corpus no
+# deshace ninguna revisión ya hecha.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Detectar declaraciones
+
+on:
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: "Días hacia atrás a procesar (0 = corpus completo)"
+        required: false
+        default: "0"
+  schedule:
+    # Después del scraping (10:00 UTC) y de la word cloud (12:00 UTC), para
+    # trabajar sobre noticias ya sincronizadas. GitHub encola los crons con
+    # retraso variable, así que el margen es holgado a propósito.
+    - cron: "30 13 * * *"
+
+jobs:
+  detectar-declaraciones:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Comprobar prerrequisitos
+        id: preflight
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          faltan=()
+          [ -n "$SUPABASE_URL" ]              || faltan+=("SUPABASE_URL")
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || faltan+=("SUPABASE_SERVICE_ROLE_KEY")
+
+          if [ ${#faltan[@]} -eq 0 ]; then
+            echo "listo=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### ✅ Prerrequisitos presentes"
+              echo ""
+              echo "Se ejecuta \`scripts/build_declaraciones.py\`."
+              echo ""
+              echo "Si falla contra la base de datos, comprueba que"
+              echo "\`supabase/declaraciones.sql\` esté aplicado: crea"
+              echo "\`medios.declaraciones\`, \`medios.actores\`,"
+              echo "\`medios.actores_candidatos\` y la función"
+              echo "\`public.truncate_actores_candidatos\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "listo=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ⏭️ Detección omitida — configuración pendiente"
+            echo ""
+            echo "Faltan estos secrets del repositorio:"
+            echo ""
+            for s in "${faltan[@]}"; do echo "- \`$s\`"; done
+            echo ""
+            echo "Se añaden en **Settings → Secrets and variables → Actions**."
+            echo "\`SUPABASE_SERVICE_ROLE_KEY\` debe ser la *service_role* key del"
+            echo "proyecto, nunca la *anon* key: el script escribe en la base de"
+            echo "datos y necesita saltarse RLS."
+            echo ""
+            echo "El job termina en verde a propósito: sin estas piezas el script"
+            echo "no puede funcionar, y fallar a diario no aporta información nueva."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configurar Python 3.11
+        if: steps.preflight.outputs.listo == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Instalar dependencias
+        if: steps.preflight.outputs.listo == 'true'
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          # spaCy y el modelo español los usa `clasificador.py` para reclasificar
+          # cada cita por tema. Sin ellos el detector sigue funcionando: cae al
+          # emparejamiento léxico y conserva los temas de la noticia y el área
+          # del cargo. Por eso la instalación del modelo no corta el job.
+          pip install "spacy==3.8.4"
+          python -m spacy download es_core_news_md || \
+            echo "::warning::Modelo es_core_news_md no disponible; se sigue sin vectores"
+
+      - name: Ejecutar tests del detector
+        if: steps.preflight.outputs.listo == 'true'
+        run: |
+          pip install pytest
+          # El detector atribuye afirmaciones a personas con nombre y apellido.
+          # Si las pruebas de falsos positivos no pasan, no se escribe nada.
+          python -m pytest tests/test_declaraciones.py -q
+
+      - name: Detectar declaraciones
+        if: steps.preflight.outputs.listo == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SOURCE_SCHEMA: ${{ vars.SUPABASE_SOURCE_SCHEMA || 'medios' }}
+          SUPABASE_SOURCE_TABLE: ${{ vars.SUPABASE_SOURCE_TABLE || 'noticias' }}
+          SUPABASE_TARGET_SCHEMA: ${{ vars.SUPABASE_TARGET_SCHEMA || 'medios' }}
+          DECLARACIONES_MIN_PRIORIDAD: ${{ vars.DECLARACIONES_MIN_PRIORIDAD || '25' }}
+          DECLARACIONES_CLASIFICAR_CITA: ${{ vars.DECLARACIONES_CLASIFICAR_CITA || '1' }}
+          # En la ejecución programada basta la ventana reciente; el corpus
+          # completo se reprocesa a mano tras tocar el detector.
+          DIAS: ${{ inputs.dias || vars.DECLARACIONES_DIAS || '45' }}
+        run: |
+          python scripts/build_declaraciones.py --dias "$DIAS" | tee resumen.txt
+          {
+            echo "### 🗣️ Declaraciones detectadas"
+            echo ""
+            echo '```'
+            cat resumen.txt
+            echo '```'
+            echo ""
+            echo "La cola de trabajo está en la vista \`medios.v_cola_verificacion\`."
+            echo "Nada de esto es público hasta que una persona cierre el veredicto"
+            echo "y ponga la fila en estado \`publicada\`."
+          } >> "$GITHUB_STEP_SUMMARY"

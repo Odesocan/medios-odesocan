@@ -10,6 +10,7 @@ publicado en GitHub Pages.
 |---|---|---|---|
 | Scraping medios canarios | `.github/workflows/scraping.yml` | diaria, 10:00 UTC | operativo |
 | Build Wordcloud Terms | `.github/workflows/build-wordcloud.yml` | diaria, 12:00 UTC | operativo |
+| Detectar declaraciones | `.github/workflows/build-declaraciones.yml` | diaria, 13:30 UTC | pendiente de aplicar el SQL |
 
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
 puede desplazarse varias horas respecto al cron. Es comportamiento de la
@@ -106,6 +107,120 @@ defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
 (`wordcloud_terms`), `WORDCLOUD_MAX_TERMS` (`80`), `WORDCLOUD_MIN_DOC_FREQ`
 (`2`).
 
+### 4. Detector de declaraciones
+
+El observatorio no sólo mide quién habla primero o cómo se enmarca un tema:
+también localiza **qué ha afirmado cada cargo público** y deja esas
+afirmaciones en una cola de trabajo.
+
+La regla que ordena el diseño entero: **la detección es automática, el
+veredicto es humano.** El pipeline nunca dice si algo es cierto o falso. Sólo
+señala «esto lo dijo tal cargo, aquí, y contiene una cifra que se puede
+contrastar». Quien verifica es una persona.
+
+`declaraciones.py` reconoce al emisor **por su cargo**, no por una lista de
+nombres. `la consejera de Sanidad` o `el alcalde de Arrecife` son patrones
+estables; un censo nominal habría que rehacerlo con cada remodelación de
+gobierno. Cuando el nombre aparece en aposición (`el presidente del Cabildo de
+La Palma, Fulana de Tal, aseguró…`) se recoge, y de ahí sale
+`medios.actores_candidatos`: el censo se cura desde el corpus en vez de
+teclearlo.
+
+Extrae las cuatro formas en que la prensa atribuye habla:
+
+| Forma | Ejemplo |
+|---|---|
+| `titular` | `Fulana: "Las listas de espera han bajado un 12%"` |
+| `directa` | `"El paro ha caído un 8,4%", aseguró la consejera de Empleo` |
+| `indirecta` | `La consejera de Sanidad asegura que hay 400 camas nuevas` |
+| `pospuesta` | `Las urgencias crecieron un 30%, según el consejero de Sanidad` |
+
+Dos señales deciden qué llega a la cola:
+
+- **Fuerza asertiva del verbo.** `cifra`, `asegura` o `niega` son aserciones y
+  se pueden contrastar. `lamenta` o `celebra` son valoraciones y `exige` es una
+  demanda: no hay nada que verificar en ellas. `promete` y `garantiza` abren
+  una vía distinta, la de seguimiento de promesas, que se verifica cuando vence
+  el plazo.
+- **Anclajes verificables dentro de la cita**: porcentajes, cifras, magnitudes,
+  unidades de servicio público (plazas, camas, listas de espera), rankings,
+  comparaciones, plazos, cuantificadores absolutos y atribuciones causales. Una
+  aserción sin ningún anclaje no entra: contrastarla sería una discusión, no
+  una verificación.
+
+De ahí sale `prioridad` (0-100), que es un **orden de trabajo sugerido, no una
+medida de gravedad ni de verosimilitud**. Nada en el pipeline evalúa si lo
+dicho es verdad.
+
+#### Falsos positivos
+
+El error caro de este detector no es dejar escapar una declaración: es
+**atribuir a alguien algo que no dijo**. `tests/test_declaraciones.py` cubre esa
+familia de casos —una cita seguida de otro cargo en la frase siguiente, un
+encabezado de sección con dos puntos (`Canarias: las claves de la semana`), un
+apellido suelto sin comillas, un entrecomillado de matiz (`el "efecto
+llamada"`)— y el workflow **no escribe nada si esas pruebas fallan**. Al
+ajustar umbrales, esas son las pruebas que no se relajan.
+
+#### Qué es público y qué no
+
+`medios.declaraciones` tiene RLS con una única política de lectura:
+`estado = 'publicada'`. La cola pendiente **no sale al exterior**, y
+`medios.actores_candidatos` tampoco tiene política ninguna, así que sólo la ve
+`service_role`. Publicar una lista de afirmaciones de personas identificables,
+marcadas por una heurística como «verificables» y sin que nadie las haya
+comprobado, sería difundir una acusación que no ha revisado nadie.
+
+La salida pública es `medios.v_declaraciones_publicas`: sólo filas con
+veredicto cerrado. Dos restricciones de tabla lo garantizan: no hay veredicto
+sin `revisado_por` y `revisado_en`, y no hay estado `publicada` sin veredicto.
+
+#### Reproceso sin perder trabajo
+
+`scripts/build_declaraciones.py` hace upsert **sólo de las columnas de
+detección** (la lista está explícita en `COLUMNAS_DETECCION`). PostgREST
+actualiza en el conflicto únicamente las columnas del payload, así que
+`estado`, `veredicto`, `fuentes` y el resto del bloque humano quedan intactos.
+Reprocesar el corpus entero tras tocar el detector es seguro: lo descartado
+sigue descartado y lo publicado sigue publicado. La clave `hash_declaracion`
+cuelga del `url_hash` de la noticia y del texto normalizado de la cita, no de
+la posición en el artículo.
+
+#### Aprovisionamiento
+
+1. **Aplicar `supabase/declaraciones.sql`** en el proyecto. Crea las tres
+   tablas, las dos vistas, las políticas RLS y
+   `public.truncate_actores_candidatos`. Esta función no recibe esquema ni
+   tabla por parámetro, a diferencia de `truncate_wordcloud_terms`: trunca una
+   tabla escrita en el cuerpo, de modo que aunque alguien logre ejecutarla no
+   puede vaciar ninguna otra.
+2. **Secrets**: los mismos que la word cloud, `SUPABASE_URL` y
+   `SUPABASE_SERVICE_ROLE_KEY`. Ya están configurados. Si faltan, el job se
+   omite y explica el motivo en el resumen, igual que el de la word cloud.
+3. **Primera pasada**: lanzar el workflow a mano con `dias = 0` para recorrer
+   todo el histórico. Después, la ejecución programada trabaja sobre una
+   ventana de 45 días.
+
+Variables opcionales (*repository variables*): `DECLARACIONES_MIN_PRIORIDAD`
+(`25`), `DECLARACIONES_DIAS` (`45`), `DECLARACIONES_CLASIFICAR_CITA` (`1`).
+La última desactiva la reclasificación temática de cada cita, que es la parte
+cara porque carga spaCy; con ella apagada se conservan igualmente los temas de
+la noticia y el área del cargo.
+
+#### Pendiente
+
+- **Registro curado.** `medios.actores` está vacío: aporta partido y periodo en
+  el cargo, que no se deducen del texto. Se rellena a mano revisando
+  `medios.actores_candidatos`, que el pipeline reconstruye en cada pasada.
+- **Interfaz de revisión.** Hoy la cola se consulta por SQL contra
+  `medios.v_cola_verificacion`. Cerrar un veredicto es un `UPDATE` a mano.
+- **Tarjeta en el dashboard.** `index.html` no lee todavía
+  `medios.v_declaraciones_publicas`. No se ha añadido porque no hay ninguna
+  verificación publicada que mostrar.
+- **Fuentes primarias.** Contrastar contra ISTAC, el Servicio Canario de Salud
+  o los presupuestos autonómicos sigue siendo trabajo manual. El detector
+  marca *qué* hay que contrastar, no *contra qué*.
+
 ## Desarrollo local
 
 ```bash
@@ -113,6 +228,10 @@ pip install -r requirements-ci.txt
 python -m spacy download es_core_news_md
 python scheduler.py --run-now      # scraping + sync + dashboard
 python generate_dashboard.py --dry-run
+
+pip install pytest
+python -m pytest tests/ -q                              # tests del detector
+python scripts/build_declaraciones.py --dias 7 --dry-run  # cola sin escribir
 ```
 
 `requirements.txt` solo contiene el cliente `supabase`, que es lo único que
