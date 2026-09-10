@@ -132,11 +132,52 @@ RTVC; `config.py` tiene 14 y ninguna fuente de tipo API. Además,
 `noticias.fuente` tiene un `CHECK` que solo admite `'rss'` y `'html'`: añadir
 una API exige tocar la restricción.
 
-## 5 · Qué queda por hacer
+## 5 · Deriva del clasificador (medida en seco el 2026-09-10)
 
-1. **Sellar el corpus histórico** con `scripts/reclasificar.py`. Su modo en seco
-   mide antes cuánta deriva hay, que es una cifra publicable por sí misma.
-   Requiere el modelo de spaCy: sin vectores el clasificador etiqueta distinto.
+`scripts/reclasificar.py` en modo seco, con `es_core_news_md` cargado, sobre las
+13.761 piezas del corpus. Clasificador: `v2-29e00cc2d46f-es_core_news_md`.
+
+| | |
+|---|---|
+| Etiqueta idéntica | 13.496 (98,1 %) |
+| Etiqueta distinta | 265 (1,9 %) |
+| Cambian de temas | 121 |
+| Se quedan sin tema | 95 |
+| Ganan tema (estaban vacías) | 49 |
+
+**La deriva no está repartida: está toda en los cuatro primeros días del
+corpus.** Del 20 de marzo en adelante, el clasificador de hoy reproduce
+exactamente las 13.139 etiquetas guardadas.
+
+| Día | Piezas | Distintas | |
+|---|---|---|---|
+| 2026-03-16 | 348 | 164 | 47,1 % |
+| 2026-03-17 | 55 | 31 | 56,4 % |
+| 2026-03-18 | 92 | 68 | 73,9 % |
+| 2026-03-19 | 127 | 2 | 1,6 % |
+| desde 2026-03-20 | 13.139 | 0 | 0,0 % |
+
+Dos conclusiones para la ficha técnica:
+
+- **El instrumento no se ha movido desde el 20 de marzo de 2026.** Las series
+  construidas sobre el corpus a partir de esa fecha son comparables entre sí sin
+  reservas por este motivo. La ventana del 16 al 19 de marzo es la única que
+  arrastra etiquetas de un clasificador anterior.
+- **Las 193 piezas con temas vacíos son todas de esa misma ventana**, no un
+  denominador parcial de un régimen posterior. De ellas, 49 recibirían tema con
+  el clasificador actual. No sirven como denominador de nada.
+
+Sellar el corpus es por tanto barato y de riesgo acotado: reescribiría 265
+etiquetas de 13.761, todas en los cuatro primeros días, y estamparía la huella
+en el resto sin tocarlas.
+
+## 6 · Qué queda por hacer
+
+1. **Sellar el corpus histórico** con `scripts/reclasificar.py --aplicar`. La
+   medida en seco ya está hecha (apartado 5): 1,9 % de deriva, toda en los
+   cuatro primeros días. Requiere el modelo de spaCy y conexión directa a
+   Postgres: sin vectores el clasificador etiqueta distinto, y el script se
+   niega a escribir en ese caso.
 2. **Reconstruir el agregado léxico**, hoy a cero filas, para que el segundo
    nivel de agenda vuelva a ser calculable y estrene el corte mensual.
 3. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
@@ -147,7 +188,7 @@ una API exige tocar la restricción.
    las observaciones. Si la cuota de Supabase se agota, el pipeline falla en
    silencio, porque `scheduler.py` captura las excepciones sin propagarlas.
 
-## 6 · Aviso de seguridad pendiente
+## 7 · Aviso de seguridad pendiente
 
 El asesor de Supabase marca como crítico que `medios.frecuencias_lexicas`
 tiene **Row Level Security deshabilitada**: cualquiera con la *anon* key
@@ -161,7 +202,7 @@ todo acceso. Decisión del equipo, no automática.
 ALTER TABLE "medios"."frecuencias_lexicas" ENABLE ROW LEVEL SECURITY;
 ```
 
-## 7 · Cómo repetir esta verificación
+## 8 · Cómo repetir esta verificación
 
 ```bash
 python -m unittest discover -s tests -v      # el plano del código
