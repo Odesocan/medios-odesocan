@@ -1,57 +1,96 @@
 # Estado verificado de la instrumentación
 
-**Fecha de verificación:** 10 de septiembre de 2026
-**Verificado contra:** árbol de trabajo de `medios-odesocan` (rama `claude/admiring-fermat-dv7g64`, idéntica a `main`) y proyecto Supabase `bd_odesocan` (`kdpsjutsgvghdtzoskkg`).
+**Última verificación:** 10 de septiembre de 2026
+**Verificado contra:** árbol de trabajo de `medios-odesocan` (rama `claude/admiring-fermat-dv7g64`) y proyecto Supabase `bd_odesocan` (`kdpsjutsgvghdtzoskkg`).
 
 Este documento acompaña a [`CUADERNO_METODOLOGICO.md`](CUADERNO_METODOLOGICO.md).
 El cuaderno describe el instrumento previsto; esto describe el que hay.
 
 ## Diagnóstico en una frase
 
-El **esquema** de la base de datos ya es el de la segunda edición, pero el
-**código** del pipeline sigue siendo el de la primera, así que el tramo nuevo
-del corpus **no ha empezado**: las columnas y tablas nuevas existen y están
-vacías, y las 13.761 piezas acumuladas pertenecen todas al tramo antiguo.
+Los cinco cambios R1–R5 están **implementados en el código y presentes en el
+esquema**, pero el tramo nuevo del corpus **no ha empezado**: las 13.761 piezas
+acumuladas siguen siendo todas del régimen antiguo, y lo seguirán siendo hasta
+la primera tirada del pipeline reinstrumentado.
 
 ## 1 · Los tres planos, por separado
 
 | Plano | Estado |
 |---|---|
-| Esquema Supabase | Segunda edición. `noticias.seccion`, `noticias.clasificador_version`, `noticias.fecha_pub_origen`, `medios.observaciones` y `wordcloud_terms.periodo` existen, con sus comentarios de columna. |
-| Código del pipeline | Primera edición. Ninguno de los cinco cambios R1–R5 está implementado. |
-| Corpus | Primera edición al 100 %. Ninguna pieza lleva sello de clasificador, fecha real ni observación de portada. |
+| Esquema Supabase | Régimen nuevo. `noticias.seccion`, `noticias.clasificador_version`, `noticias.fecha_pub_origen`, `medios.observaciones` y `wordcloud_terms.periodo` existen, con sus comentarios de columna, sus índices y su restricción única `(url_hash, run_id)`. |
+| Código del pipeline | Régimen nuevo. R1–R5 implementados y con comprobaciones automáticas en `tests/`. |
+| Corpus | Régimen antiguo al 100 %. Ninguna pieza lleva todavía sello de clasificador, fecha real ni observación de portada. |
 
-## 2 · Hoja de ruta: cuaderno frente a código
+## 2 · Hoja de ruta
 
-| | Cambio | Cuaderno | Esquema | Código | Evidencia en el código |
-|---|---|---|---|---|---|
-| R1 | Conservar las piezas sin tema | Aplicado | Listo | **No** | `scraper.py:806` descarta (`if not temas: continue`); `supabase_loader.py:131` purga las que queden |
-| R2 | Registrar la posición en portada | Aplicado | Listo (`observaciones`) | **No** | No hay ninguna escritura en `medios.observaciones` ni variable `posicion` en todo el repositorio |
-| R3 | Versión del clasificador y reclasificación | Aplicado | Listo (columna) | **No** | `clasificador.py` no emite huella; el cargador no escribe `clasificador_version` |
-| R4 | Fecha de publicación real y su procedencia | Aplicado | Listo (columna) | **No** | No existe extracción de fecha desde URL, JSON-LD, `<meta>` o `<time>`; `fecha_pub_origen` nunca se escribe |
-| R5 | Cadencia sub-diaria y corte temporal del agregado | Aplicado | Listo (`periodo`) | **No** | `.github/workflows/scraping.yml:13` → `cron: "0 10 * * *"` (una tirada diaria); `scripts/build_wordcloud_terms.py:374` trunca la tabla entera y no escribe `periodo` |
-| R6 | Agrupamiento por acontecimiento | Pendiente | — | — | Trabajo de análisis, no de pipeline |
+| | Cambio | Esquema | Código | Dónde |
+|---|---|---|---|---|
+| R1 | Conservar las piezas sin tema | Listo | Listo | `scraper.py` (`guardar_noticia`, bucle de `scrapear_medio`), `supabase_loader.py` |
+| R2 | Registrar posición y permanencia en portada | Listo | Listo | `scraper.py` (`registrar_observacion`), `supabase_loader.py` (`sincronizar_observaciones`) |
+| R3 | Versión del clasificador y reclasificación | Listo | Listo | `clasificador.py` (`version_clasificador`), `scripts/reclasificar.py` |
+| R4 | Fecha de publicación real y su procedencia | Listo | Listo | `scraper.py` (`fecha_desde_url`, `fecha_desde_html`, `seccion_desde_url`) |
+| R5 | Cadencia sub-diaria y corte temporal del agregado | Listo | Listo | `.github/workflows/scraping.yml`, `scripts/build_wordcloud_terms.py` |
+| R6 | Agrupamiento de piezas por acontecimiento | — | Pendiente | Trabajo de análisis, no de pipeline |
 
-### Otras divergencias entre el cuaderno y el código
+### Qué hace ahora cada tirada
 
-| Afirmación del cuaderno | Realidad del repositorio |
+1. Recorre el listado **entero** de cada cabecera, sin cuota y sin caché. La
+   cuota por medio (30/25/20) ha desaparecido de `config.py`; queda un tope de
+   seguridad de 300 que solo salta si un selector se desmadra.
+2. Registra **una observación por pieza y tirada**, esté o no en el corpus, con
+   su posición dentro del listado de origen y la fuente. Es lo que mide
+   duración de la atención y prominencia.
+3. Da de alta las piezas nuevas **con tema o sin él**, sellándolas con la huella
+   del clasificador y con la procedencia de su fecha.
+4. Descarga el cuerpo solo de las piezas nuevas con tema, hasta **15 por
+   cabecera y tirada**. Del mismo HTML sale la fecha exacta, así que no se paga
+   dos veces.
+5. Antes de empezar, pregunta al corpus remoto qué piezas ya conoce. Sin esa
+   consulta, las cuatro tiradas diarias multiplicarían por cuatro las descargas,
+   porque en integración continua la base local arranca vacía.
+
+### Correcciones que salieron al verificar
+
+- **Brotli anunciado sin soporte.** El cliente pedía `Accept-Encoding: br` sin
+  tener la librería, así que ante una respuesta comprimida devolvía binario sin
+  descomprimir, que pasaba el control de longitud mínima y se cacheaba como si
+  fuera HTML. Una cabecera podía rendir cero por esto sin ningún error visible.
+- **Listado servido desde una caché de siete días.** En integración continua no
+  mordía porque el runner es efímero, pero en local habría fabricado permanencia
+  falsa en la tabla de observaciones nada más crearla.
+- **Enlaces de navegación en el denominador.** «Ver más» o «Sucesos» entran por
+  el mismo selector CSS que las piezas. Antes daba igual, porque el clasificador
+  los borraba; desde R1 contarían como denominador y deflactarían todas las
+  cuotas. En la primera tirada real sobre El Hierro Hoy eran 6 de 43.
+- **Colisión de nombres en el identificador de tirada.** El `run_id` de las
+  observaciones se pisaba con el identificador de fila de `scraping_log`, de
+  modo que cada cabecera creía estar en una tirada distinta y la permanencia
+  quedaba inservible. Lo detectó una de las comprobaciones de `tests/`.
+- **Filtrado de pendientes con 30.000 parámetros SQL.** La sincronización
+  excluía lo ya subido con un `NOT IN` parametrizado; pasado el límite de
+  variables de SQLite (32.766) habría reventado, y con el ritmo nuevo el corpus
+  lo alcanza en semanas. Ahora se filtra en Python.
+
+## 3 · Primera tirada real (verificación de campo)
+
+Ejecutada contra El Hierro Hoy el 2026-09-10, con el pipeline nuevo:
+
+| | |
 |---|---|
-| 17 cabeceras configuradas, dos agencias y RTVC | 14 en `config.py`. No hay EFE, Europa Press ni RTVC |
-| Fuente API REST para RTVC | No existe. Además `noticias.fuente` tiene un `CHECK` que solo admite `'rss'` y `'html'`: añadir una API exige tocar la restricción |
-| Cuota del listado sin tope | `max_items` sigue en 30 / 25 / 20 por cabecera (`config.py`), con techo global de 50 (`config.py:644`) |
-| Cuota de texto completo: 15 artículos por cabecera y tirada | No hay tal presupuesto: se intenta la descarga de toda pieza nueva con tema (`scraper.py:815`) |
-| Ficheros `observatorio/`, `db/esquema.sql`, `ARQUITECTURA.md` | No existen. El repositorio es plano: `scraper.py`, `clasificador.py`, `supabase_loader.py`, `scheduler.py`, `generate_dashboard.py` |
+| Piezas en el listado | 32 (antes la cuota la cortaba en 20) |
+| Con tema | 9 |
+| Sin tema (denominador) | 23, el 72 % |
+| Observaciones | 32, posiciones 1–14 en el feed y 15–32 en la portada |
+| Fecha real | 14 del feed, 3 del JSON-LD del artículo, 15 sintéticas declaradas |
 
-### Lo que el cuaderno describe bien
+El 72 % de denominador invisible confirma el orden de magnitud que anticipaba
+el cuaderno: cualquier cuota calculada sobre el tramo antiguo está inflada por
+un factor de esa escala.
 
-Comprobado y correcto: 15 temas; umbral `SCORE_MINIMO = 2.6` (`clasificador.py:29`);
-`peso_titulo` a 4 en violencia de género y salud mental y a 2 en política y medio
-ambiente; truncamiento de `texto_full` a 5.000 caracteres; `respetar_robots = False`
-(`config.py:649`) y rotación de 12 user-agents de navegador (amenaza A9).
+## 4 · Auditoría del corpus
 
-## 3 · Auditoría del corpus
-
-Consulta del apartado 4.3 del cuaderno, ejecutada el 2026-09-10.
+Consulta del apartado 4.3 del cuaderno, ejecutada el 2026-09-10, antes de la
+primera tirada del régimen nuevo.
 
 | Métrica | Valor |
 |---|---|
@@ -70,7 +109,7 @@ Consulta del apartado 4.3 del cuaderno, ejecutada el 2026-09-10.
 
 Es el hallazgo que agrava la amenaza A7: la cobertura no es «parcial pero
 homogénea», es **radicalmente desigual**. Comparar encuadres entre estas
-cabeceras hoy confunde el marco con la calidad de extracción.
+cabeceras confunde el marco con la calidad de extracción.
 
 | Cabecera | Piezas | % con texto | Sin tema |
 |---|---|---|---|
@@ -88,28 +127,27 @@ cabeceras hoy confunde el marco con la calidad de extracción.
 | elhierrohoy | 273 | **0,0** | 0 |
 
 `elpueblocanario` y `canariasnoticias` siguen sin ninguna pieza: el universo
-efectivo es 12, no 15 ni 17.
+efectivo es 12, no 15 ni 17. El cuaderno declara 17 cabeceras, dos agencias y
+RTVC; `config.py` tiene 14 y ninguna fuente de tipo API. Además,
+`noticias.fuente` tiene un `CHECK` que solo admite `'rss'` y `'html'`: añadir
+una API exige tocar la restricción.
 
-Ninguna cabecera registra `seccion` (0 valores distintos en las doce).
+## 5 · Qué queda por hacer
 
-## 4 · Consecuencias para el análisis, hoy
+1. **Sellar el corpus histórico** con `scripts/reclasificar.py`. Su modo en seco
+   mide antes cuánta deriva hay, que es una cifra publicable por sí misma.
+   Requiere el modelo de spaCy: sin vectores el clasificador etiqueta distinto.
+2. **Reconstruir el agregado léxico**, hoy a cero filas, para que el segundo
+   nivel de agenda vuelva a ser calculable y estrene el corte mensual.
+3. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
+   técnica, y el volumen de peticiones se ha multiplicado por cuatro.
+4. **Diagnosticar o retirar las dos cabeceras muertas**, para que el universo
+   declarado y el efectivo coincidan.
+5. **Vigilar el crecimiento**: del orden de 1.500 filas diarias de noticias más
+   las observaciones. Si la cuota de Supabase se agota, el pipeline falla en
+   silencio, porque `scheduler.py` captura las excepciones sin propagarlas.
 
-1. **Toda cuota calculada ahora es relativa a la agenda de ODESOCAN**, no a la
-   producción del medio. Las 193 piezas sin tema no son un denominador: son un
-   residuo, y no cubren a todas las cabeceras.
-2. **No hay prominencia ni duración de la atención.** `observaciones` está
-   vacía, así que las filas 4 y 5 de la Tabla 3 del cuaderno son «bloqueado»,
-   no «disponible».
-3. **No hay análisis temporal por fecha de publicación.** Cero piezas con fecha
-   fiable: la única marca es `fecha_scrap`, que codifica el orden del
-   diccionario de configuración, no el de publicación. La trampa del capítulo 8
-   sigue activa, no evitable.
-4. **El segundo nivel de agenda no es calculable ahora mismo**, no por diseño
-   sino porque el agregado está vacío. Hay que reconstruirlo antes de usarlo.
-5. **El encuadre está limitado a las siete cabeceras con cobertura de texto
-   alta.** Las otras cinco no tienen cuerpo que codificar.
-
-## 5 · Aviso de seguridad pendiente
+## 6 · Aviso de seguridad pendiente
 
 El asesor de Supabase marca como crítico que `medios.frecuencias_lexicas`
 tiene **Row Level Security deshabilitada**: cualquiera con la *anon* key
@@ -123,15 +161,13 @@ todo acceso. Decisión del equipo, no automática.
 ALTER TABLE "medios"."frecuencias_lexicas" ENABLE ROW LEVEL SECURITY;
 ```
 
-## 6 · Cómo repetir esta verificación
+## 7 · Cómo repetir esta verificación
 
 ```bash
-# Plano código
-grep -rn "observaciones\|fecha_pub_origen\|clasificador_version\|posicion\|periodo" \
-     --include=*.py --include=*.sql --include=*.yml .
-grep -n "cron" .github/workflows/scraping.yml
+python -m unittest discover -s tests -v      # el plano del código
 ```
 
-El plano corpus se comprueba con la consulta de auditoría del apartado 4.3 del
-cuaderno. Mientras devuelva `tramo_antiguo = piezas`, el régimen nuevo no ha
-empezado.
+El plano del corpus se comprueba con la consulta de auditoría del apartado 4.3
+del cuaderno. Mientras devuelva `tramo_antiguo = piezas`, el régimen nuevo no ha
+empezado; en cuanto empiece, toda serie que cruce esa fecha mide en parte el
+cambio del instrumento.

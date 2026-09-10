@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# Scraping diario de medios canarios — ODESOCAN
+# Scraping de medios canarios — ODESOCAN
 # Ejecuta el pipeline: scraping → sync Supabase → genera dashboard → commit
 # ──────────────────────────────────────────────────────────────────────────────
  
@@ -7,10 +7,19 @@ name: Scraping medios canarios
  
 on:
   schedule:
-    # Cada día a las 10:00 UTC (11:00 hora Canarias). GitHub encola los crons
-    # con retraso variable: la hora real de arranque oscila entre las 10:00 y
-    # las 20:00 UTC. Es comportamiento normal de la plataforma, no un fallo.
-    - cron: "0 10 * * *"
+    # Cuatro tiradas diarias, cada seis horas (R5). Es lo que da grano
+    # intradiario a la permanencia en portada: con una sola observación al día,
+    # las piezas que aparecen y desaparecen dentro del mismo ciclo son
+    # invisibles para el instrumento.
+    #
+    # El coste NO se multiplica por cuatro: lo que se repite es el listado (una
+    # petición por cabecera), no la descarga de artículos. El scraper consulta
+    # primero qué piezas ya están en el corpus y se las salta.
+    #
+    # GitHub encola los crons con retraso variable: la hora real de arranque
+    # puede desplazarse varias horas. Es comportamiento normal de la
+    # plataforma, no un fallo, y por eso las cuatro tiradas son orientativas.
+    - cron: "0 2,8,14,20 * * *"
   workflow_dispatch:   # Permite ejecución manual desde la UI de GitHub Actions
     inputs:
       medio:

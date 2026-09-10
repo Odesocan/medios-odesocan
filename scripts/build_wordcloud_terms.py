@@ -9,6 +9,7 @@ Fuente esperada por fila (columnas reales de medios.noticias):
 - titulo
 - resumen
 - texto_full
+- fecha_scrap
 
 Destino:
 - tabla wordcloud_terms con agregados por:
@@ -16,6 +17,16 @@ Destino:
   - medio
   - tema
   - medio + tema
+
+Cada ámbito se calcula dos veces (R5):
+  - `periodo = '__all__'`: el corpus acumulado, que es lo que consume el
+    dashboard;
+  - `periodo = 'AAAA-MM'`: un corte por mes, hasta doce, que es lo que permite
+    seguir en el tiempo el vocabulario de una cabecera dentro de un tema.
+
+El mes se deriva de `fecha_scrap`, no de `fecha_pub`: la primera está siempre
+presente y es uniforme entre cabeceras, y la segunda tiene seis procedencias
+distintas. Al agregar por mes la diferencia es despreciable.
 """
 
 from __future__ import annotations
@@ -31,7 +42,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Sequence, Tuple
 
-from supabase import Client, create_client
+try:
+    from supabase import Client, create_client
+except ImportError:   # pragma: no cover
+    # El cálculo del agregado es Python puro y se puede probar sin el SDK.
+    # Solo hace falta para hablar con la base de datos, y eso se comprueba en
+    # get_client(), no al importar.
+    Client = object
+    create_client = None
 
 
 SOURCE_SCHEMA = os.getenv("SUPABASE_SOURCE_SCHEMA", "medios")
@@ -41,6 +59,20 @@ TARGET_TABLE = os.getenv("SUPABASE_TARGET_TABLE", "wordcloud_terms")
 
 MAX_TERMS_PER_SCOPE = int(os.getenv("WORDCLOUD_MAX_TERMS", "80"))
 MIN_DOC_FREQ = int(os.getenv("WORDCLOUD_MIN_DOC_FREQ", "2"))
+# Meses de corte que se conservan. Doce cubre un año de serie sin que la tabla
+# se dispare: cada mes multiplica las filas por el número de ámbitos vivos.
+MONTHS_KEPT = int(os.getenv("WORDCLOUD_MONTHS", "12"))
+# Un ámbito mensual con cuatro piezas no es vocabulario, es ruido. Para el
+# análisis, el cuaderno recomienda además descartar por debajo de 30 usando la
+# columna n_noticias.
+MIN_DOCS_PERIODO = int(os.getenv("WORDCLOUD_MIN_DOCS_PERIODO", "5"))
+# Desde R1 el corpus incluye las piezas sin tema, que son el denominador de la
+# saliencia. Para el vocabulario no sirven: meterlas cambiaría el significado
+# de los ámbitos global y por medio, que dejarían de ser «cómo habla esta
+# cabecera de la agenda de ODESOCAN».
+ONLY_WITH_TOPICS = os.getenv("WORDCLOUD_SOLO_CON_TEMA", "1") not in ("0", "false", "False")
+
+PERIODO_ACUMULADO = "__all__"
 BATCH_SIZE = int(os.getenv("SUPABASE_BATCH_SIZE", "1000"))
 UPSERT_CHUNK_SIZE = int(os.getenv("WORDCLOUD_UPSERT_CHUNK_SIZE", "500"))
 
@@ -51,6 +83,7 @@ SOURCE_COLUMNS = [
     "titulo",
     "resumen",
     "texto_full",
+    "fecha_scrap",
 ]
 
 FIELD_WEIGHTS = {
@@ -93,6 +126,7 @@ class NewsItem:
     titulo: str
     resumen: str
     texto_full: str
+    periodo: str   # "AAAA-MM" derivado de fecha_scrap
 
 
 def env_required(name: str) -> str:
@@ -103,6 +137,10 @@ def env_required(name: str) -> str:
 
 
 def get_client() -> Client:
+    if create_client is None:
+        raise RuntimeError(
+            "Falta el cliente de Supabase. Instálalo con: pip install -r requirements.txt"
+        )
     # Se comprueban las dos a la vez: si faltan ambas, conviene enterarse de
     # golpe y no de una en una en ejecuciones sucesivas.
     faltan = [
@@ -196,6 +234,14 @@ def parse_topics(value: object) -> Tuple[str, ...]:
     return tuple()
 
 
+def mes_de(fecha_scrap: object) -> str:
+    """Deriva 'AAAA-MM' de una marca temporal ISO. Cadena vacía si no la hay."""
+    texto = str(fecha_scrap or "").strip()
+    if len(texto) < 7 or texto[4] != "-":
+        return ""
+    return texto[:7]
+
+
 def fetch_all_news(client: Client) -> List[NewsItem]:
     rows = []
     offset = 0
@@ -212,14 +258,18 @@ def fetch_all_news(client: Client) -> List[NewsItem]:
         if not batch:
             break
         for row in batch:
+            temas = parse_topics(row.get("temas"))
+            if ONLY_WITH_TOPICS and not temas:
+                continue
             rows.append(
                 NewsItem(
                     record_id=str(row.get("id")),
                     medio=str(row.get("medio") or "").strip(),
-                    temas=parse_topics(row.get("temas")),
+                    temas=temas,
                     titulo=str(row.get("titulo") or "").strip(),
                     resumen=str(row.get("resumen") or "").strip(),
                     texto_full=str(row.get("texto_full") or "").strip(),
+                    periodo=mes_de(row.get("fecha_scrap")),
                 )
             )
         if len(batch) < BATCH_SIZE:
@@ -263,7 +313,10 @@ def make_scope_key(medio: str | None, tema: str | None) -> str:
     return f"medio:{medio}|tema:{tema}"
 
 
-def build_aggregates(news_items: Sequence[NewsItem]) -> List[Dict[str, object]]:
+def build_aggregates(
+    news_items: Sequence[NewsItem],
+    periodo: str = PERIODO_ACUMULADO,
+) -> List[Dict[str, object]]:
     generated_at = datetime.now(timezone.utc).isoformat()
     scope_tf: Dict[Tuple[str | None, str | None], Counter] = defaultdict(Counter)
     scope_df: Dict[Tuple[str | None, str | None], Dict[str, set]] = defaultdict(lambda: defaultdict(set))
@@ -291,8 +344,11 @@ def build_aggregates(news_items: Sequence[NewsItem]) -> List[Dict[str, object]]:
                 scope_df[scope][key].add(item.record_id)
 
     rows: List[Dict[str, object]] = []
+    minimo_docs = 1 if periodo == PERIODO_ACUMULADO else MIN_DOCS_PERIODO
     for scope, tf_counter in scope_tf.items():
         total_docs = len(scope_totals[scope])
+        if total_docs < minimo_docs:
+            continue   # un ámbito mensual diminuto no es vocabulario, es ruido
         medio, tema = scope
         ranked_rows = []
         for key, term_freq in tf_counter.items():
@@ -314,6 +370,7 @@ def build_aggregates(news_items: Sequence[NewsItem]) -> List[Dict[str, object]]:
                     "term_freq": round(term_freq, 4),
                     "sample_titles": scope_examples[scope][key],
                     "n_noticias": total_docs,
+                    "periodo": periodo,
                     "generated_at": generated_at,
                 }
             )
@@ -353,10 +410,18 @@ def upsert_rows(client: Client, rows: Sequence[Dict[str, object]]) -> None:
             .table(TARGET_TABLE)
             .upsert(
                 list(batch),
-                on_conflict="scope_key,gram_type,normalized_term",
+                # La clave primaria incluye el periodo desde R5: sin él, el
+                # corte mensual pisaría al acumulado ámbito por ámbito.
+                on_conflict="scope_key,normalized_term,gram_type,periodo",
             )
             .execute()
         )
+
+
+def meses_a_construir(news_items: Sequence[NewsItem]) -> List[str]:
+    """Los últimos MONTHS_KEPT meses presentes en el corpus, de antiguo a nuevo."""
+    meses = sorted({item.periodo for item in news_items if item.periodo})
+    return meses[-MONTHS_KEPT:] if MONTHS_KEPT > 0 else []
 
 
 def main() -> int:
@@ -366,10 +431,19 @@ def main() -> int:
         print("No se recuperaron noticias desde Supabase.", file=sys.stderr)
         return 1
 
-    aggregates = build_aggregates(news_items)
+    # 1. El acumulado, que es lo que consume el dashboard.
+    aggregates = build_aggregates(news_items, PERIODO_ACUMULADO)
     if not aggregates:
         print("No se generaron agregados de términos.", file=sys.stderr)
         return 1
+    resumen = [f"{PERIODO_ACUMULADO}: {len(aggregates)} filas"]
+
+    # 2. Los cortes mensuales, que son los que permiten una serie de atributos.
+    for mes in meses_a_construir(news_items):
+        del_mes = [item for item in news_items if item.periodo == mes]
+        filas_mes = build_aggregates(del_mes, mes)
+        aggregates.extend(filas_mes)
+        resumen.append(f"{mes}: {len(filas_mes)} filas / {len(del_mes)} noticias")
 
     truncate_target_table(client)
     upsert_rows(client, aggregates)
@@ -377,6 +451,13 @@ def main() -> int:
         f"Word cloud generada: {len(news_items)} noticias procesadas, "
         f"{len(aggregates)} filas agregadas."
     )
+    for linea in resumen:
+        print(f"  {linea}")
+    if ONLY_WITH_TOPICS:
+        print(
+            "  (solo piezas con tema: las del denominador no entran en el "
+            "vocabulario)"
+        )
     return 0
 
 

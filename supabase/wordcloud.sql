@@ -94,3 +94,40 @@ revoke all     on function public.truncate_wordcloud_terms(text, text) from publ
 revoke execute on function public.truncate_wordcloud_terms(text, text) from anon;
 revoke execute on function public.truncate_wordcloud_terms(text, text) from authenticated;
 grant  execute on function public.truncate_wordcloud_terms(text, text) to service_role;
+
+-- ── Corte temporal del agregado (R5) ─────────────────────────────────────────
+-- Verificado presente en bd_odesocan el 2026-09-10.
+--
+-- Sin `periodo`, el agregado solo respondía a «qué palabras dominan el archivo
+-- entero»: se truncaba y se reconstruía sobre el corpus completo en cada
+-- ejecución, de modo que no admitía series. Ahora convive el acumulado
+-- (`periodo = '__all__'`, que es lo que consume el dashboard) con un corte
+-- mensual, y la clave primaria incluye el periodo para que uno no pise al otro.
+--
+-- El mes se deriva de `fecha_scrap`, no de `fecha_pub`: la primera está siempre
+-- presente y es uniforme entre cabeceras, y la segunda tiene seis procedencias
+-- distintas.
+alter table medios.wordcloud_terms
+  add column if not exists periodo text not null default '__all__';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_index i
+    join pg_class c on c.oid = i.indexrelid
+    where c.relname = 'wordcloud_terms_pkey'
+      and i.indnatts = 4
+  ) then
+    alter table medios.wordcloud_terms drop constraint if exists wordcloud_terms_pkey;
+    alter table medios.wordcloud_terms
+      add constraint wordcloud_terms_pkey
+      primary key (periodo, scope_key, gram_type, normalized_term);
+  end if;
+end
+$$;
+
+create index if not exists wordcloud_terms_periodo_idx
+  on medios.wordcloud_terms (periodo, medio, tema, score desc);
+
+comment on column medios.wordcloud_terms.periodo is
+'__all__ = corpus acumulado (lo que consume el dashboard). AAAA-MM = corte mensual, para series temporales de atributos. Derivado de fecha_scrap.';

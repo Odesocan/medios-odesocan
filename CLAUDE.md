@@ -13,9 +13,11 @@ solo un pipeline. Antes de tocar la ingesta o de calcular cualquier cifra, leer:
 - [`docs/estado-instrumentacion.md`](docs/estado-instrumentacion.md) — qué hay
   realmente en el código, el esquema y el corpus. Verificado el 2026-09-10.
 
-**Los dos no coinciden.** El cuaderno da por aplicados cinco cambios (R1–R5) que
-el código de este repositorio no implementa. Cualquier afirmación sobre lo que
-el observatorio «ya mide» debe comprobarse contra el segundo documento.
+Los cinco cambios de instrumentación (R1–R5) están implementados desde el
+2026-09-10, pero **el corpus acumulado sigue siendo todo del régimen antiguo**:
+lo que el cuaderno da por medible lo será a partir de la primera tirada del
+pipeline nuevo, no hacia atrás. Cualquier afirmación sobre lo que el
+observatorio «ya mide» debe comprobarse contra el segundo documento.
 
 ## Reglas metodológicas de obligado cumplimiento
 
@@ -72,6 +74,27 @@ de códigos y α obtenida. Citar el commit concreto.
 | `scheduler.py` | Encadena scraping → sync → dashboard; captura excepciones sin propagarlas |
 | `scripts/build_wordcloud_terms.py` | Agregado léxico ponderado en `medios.wordcloud_terms` |
 | `index.html` | Dashboard autónomo; lee Supabase desde el navegador con la *anon* key |
+| `scripts/reclasificar.py` | Sella el corpus con la versión del clasificador y mide su deriva |
+| `tests/` | Comprueba que el pipeline registra lo que el cuaderno dice que registra |
+| `supabase/esquema.sql` | Esquema del régimen nuevo, idempotente y comentado |
+
+## Antes de tocar la ingesta
+
+Cada columna del régimen nuevo sostiene una medida concreta, y quitarla o
+dejar de escribirla no rompe nada visible: simplemente deja de ser calculable
+algo que el cuaderno promete.
+
+| Si cambias… | Se cae… |
+|---|---|
+| El descarte de piezas sin tema | El denominador, y con él toda saliencia relativa a la producción |
+| La escritura en `observaciones` | Duración de la atención y prominencia |
+| El caché del listado | La permanencia, que pasa a ser falsa sin previo aviso |
+| La cadencia de tiradas | El grano de la permanencia: cualquier serie anterior deja de ser comparable |
+| `fecha_pub_origen` | La distinción entre fecha real y hora del raspado |
+| La huella del clasificador | La comparabilidad longitudinal del etiquetado |
+
+Ejecuta `python -m unittest discover -s tests` antes de dar por buena una
+modificación del scraper o del cargador.
 
 ## Convenciones
 

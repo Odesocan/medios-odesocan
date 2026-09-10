@@ -12,6 +12,8 @@ La salida sigue siendo multietiqueta y compatible con el flujo existente.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import re
 import unicodedata
@@ -133,6 +135,64 @@ def _cargar_modelo():
 
 _NLP = _cargar_modelo()
 _HAS_VECTORS = bool(_NLP and getattr(_NLP.vocab, "vectors_length", 0))
+
+
+# ── Identidad del clasificador (R3) ───────────────────────────────────────────
+# Dos piezas etiquetadas con clasificadores distintos no son comparables en una
+# serie temporal. Para saberlo hace falta que cada pieza lleve la huella del
+# clasificador que la etiquetó: es lo que se guarda en
+# `noticias.clasificador_version`.
+#
+# La huella cubre todo lo que puede cambiar una etiqueta:
+#   - la lógica de puntuación (ALGORITMO_VERSION, que se sube a mano)
+#   - el umbral de decisión
+#   - las pistas léxicas y de URL de este módulo
+#   - la configuración de temas de config.py (keywords, peso_titulo, label)
+#   - el modelo de spaCy disponible, porque sin vectores la señal semántica
+#     desaparece y el mismo titular puede quedar sin tema
+ALGORITMO_VERSION = "2"
+
+
+def _huella_configuracion() -> str:
+    """SHA-256 truncado de todo lo que determina una etiqueta."""
+    material = {
+        "algoritmo": ALGORITMO_VERSION,
+        "score_minimo": SCORE_MINIMO,
+        "extra_theme_hints": {k: list(v) for k, v in sorted(EXTRA_THEME_HINTS.items())},
+        "url_theme_hints": {k: list(v) for k, v in sorted(URL_THEME_HINTS.items())},
+        "temas": {
+            tema: {
+                "label": cfg.get("label"),
+                "peso_titulo": cfg.get("peso_titulo"),
+                "keywords": list(cfg.get("keywords", ())),
+            }
+            for tema, cfg in sorted(TEMAS.items())
+        },
+    }
+    serializado = json.dumps(material, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(serializado.encode("utf-8")).hexdigest()[:12]
+
+
+def _huella_modelo() -> str:
+    """Identifica el modelo lingüístico realmente cargado."""
+    if not _NLP:
+        return "sin_spacy"
+    meta = getattr(_NLP, "meta", {}) or {}
+    nombre = f"{meta.get('lang', 'xx')}_{meta.get('name', 'desconocido')}"
+    return nombre if _HAS_VECTORS else f"{nombre}_sin_vectores"
+
+
+def version_clasificador() -> str:
+    """
+    Huella estable del clasificador, para sellar cada pieza que etiqueta.
+
+    Formato: v<algoritmo>-<huella de configuración>-<modelo>
+    Ejemplo: v2-9a3f1c2b8d40-es_core_news_md
+    """
+    return f"v{ALGORITMO_VERSION}-{_huella_configuracion()}-{_huella_modelo()}"
+
+
+CLASIFICADOR_VERSION = version_clasificador()
 
 
 def _normalizar(texto: str) -> str:
