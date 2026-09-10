@@ -1,0 +1,84 @@
+# medios-odesocan · guía de trabajo
+
+Observatorio de Medios de Canarias (ODESOCAN). Raspado de portadas y feeds de la
+prensa canaria, clasificación multietiqueta en 15 temas de derechos sociales,
+volcado a PostgreSQL/Supabase (`bd_odesocan`, esquema `medios`) y dashboard
+estático en GitHub Pages.
+
+El proyecto es **un instrumento de medida en ciencias de la comunicación**, no
+solo un pipeline. Antes de tocar la ingesta o de calcular cualquier cifra, leer:
+
+- [`docs/CUADERNO_METODOLOGICO.md`](docs/CUADERNO_METODOLOGICO.md) — qué mide el
+  instrumento, qué puede medir y qué no. Segunda edición, septiembre de 2026.
+- [`docs/estado-instrumentacion.md`](docs/estado-instrumentacion.md) — qué hay
+  realmente en el código, el esquema y el corpus. Verificado el 2026-09-10.
+
+**Los dos no coinciden.** El cuaderno da por aplicados cinco cambios (R1–R5) que
+el código de este repositorio no implementa. Cualquier afirmación sobre lo que
+el observatorio «ya mide» debe comprobarse contra el segundo documento.
+
+## Reglas metodológicas de obligado cumplimiento
+
+Valen tanto para el análisis en R como para cualquier cifra que se publique.
+
+1. **La unidad es la pieza-en-portada**, no el artículo, no el acontecimiento y
+   no la producción del medio. Declararlo así en cualquier publicación.
+2. **Peso fraccionado (1/k) en toda cuota de saliencia.** El recuento pleno solo
+   sirve para co-ocurrencia temática. La media es de 1,24 temas por pieza: la
+   diferencia entre criterios llega al 25 % y altera rankings.
+3. **Declarar siempre el denominador**: producción total de la cabecera, o
+   agenda temática de ODESOCAN. Son dos cuotas distintas. Hoy solo es calculable
+   la segunda.
+4. **Nunca comparar volúmenes brutos entre cabeceras.** Las cuotas de raspado
+   son desiguales (30/25/20), así que el volumen mide la configuración del
+   raspador. Solo son comparables las distribuciones internas.
+5. **La agenda del sistema es la media no ponderada de las cuotas por cabecera**,
+   nunca la agregación de piezas.
+6. **`fecha_scrap` no es fecha de publicación.** Codifica el orden del
+   diccionario de configuración: un análisis de liderazgo construido sobre ella
+   «descubrirá» que la primera cabecera marca la agenda. Hoy no hay alternativa
+   en el corpus, así que el análisis de precedencia está bloqueado.
+7. **Reportar el sesgo del clasificador**: `peso_titulo` vale 4 en violencia de
+   género y salud mental y 2 en política y medio ambiente, con umbral 2,6. Esos
+   dos temas se activan con más facilidad. No es asimetría de la agenda de los
+   medios.
+8. **Encuadre solo con libro de códigos y α de Krippendorff ≥ 0,80.** Un tópico
+   estadístico no es un marco. Sin fiabilidad intercodificadora, no se publica.
+9. **No llamar priming a lo que no lo es.** Sin serie externa de opinión pública
+   solo hay establecimiento de agenda; llamarlo así es una contribución legítima
+   y honesta.
+10. **Cualquier serie que cruce un cambio de instrumentación mide, en parte, el
+    cambio del instrumento.** Advertirlo siempre.
+
+Antes de cualquier análisis, ejecutar la consulta de auditoría del apartado 4.3
+del cuaderno. Las proporciones se miden, no se suponen.
+
+## Ficha técnica
+
+Toda publicación derivada del corpus lleva la ficha del apartado 11 del
+cuaderno: ventana y volumen por cabecera, régimen de medida, universo declarado
+frente a efectivo, denominador, regla de ponderación, fiabilidad de la marca
+temporal, cobertura de texto, versión del clasificador y, si hay encuadre, libro
+de códigos y α obtenida. Citar el commit concreto.
+
+## Mapa del repositorio
+
+| Fichero | Función |
+|---|---|
+| `config.py` | `MEDIOS` (14 cabeceras), `TEMAS` (15), `SCRAPER`, `USER_AGENTS` |
+| `scraper.py` | Recolección RSS + HTML, extracción de texto, SQLite efímero |
+| `clasificador.py` | Clasificación híbrida multietiqueta (keywords, lemas, URL, spaCy) |
+| `supabase_loader.py` | Sincronización con `medios.noticias` por `psycopg2` |
+| `scheduler.py` | Encadena scraping → sync → dashboard; captura excepciones sin propagarlas |
+| `scripts/build_wordcloud_terms.py` | Agregado léxico ponderado en `medios.wordcloud_terms` |
+| `index.html` | Dashboard autónomo; lee Supabase desde el navegador con la *anon* key |
+
+## Convenciones
+
+- Documentación y comentarios en español.
+- El usuario trabaja principalmente en **R**; los ejemplos de análisis van en R
+  salvo que se pida otra cosa. El pipeline es Python.
+- `scheduler.py` no propaga errores: un fallo de sincronización deja el workflow
+  en verde. Comprobar el log del job, no el aspa.
+- La *anon* key de Supabase es pública y va en `index.html`. Nada sensible debe
+  depender de ella; para escribir se usa la *service_role* key, solo en secrets.

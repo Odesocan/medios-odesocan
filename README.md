@@ -4,6 +4,17 @@ Observatorio de medios canarios de ODESOCAN: scraping diario de la prensa
 canaria, clasificación temática y volcado a Supabase, con un dashboard estático
 publicado en GitHub Pages.
 
+## Metodología
+
+El observatorio es un instrumento de medida, no solo un pipeline. Antes de
+calcular o publicar cualquier cifra:
+
+- [`docs/CUADERNO_METODOLOGICO.md`](docs/CUADERNO_METODOLOGICO.md) — qué mide el
+  instrumento, qué puede medir y qué no (agenda, encuadre, priming, precedencia).
+- [`docs/estado-instrumentacion.md`](docs/estado-instrumentacion.md) — estado
+  verificado del código, el esquema y el corpus a 2026-09-10, y en qué diverge
+  del cuaderno.
+
 ## Pipelines
 
 | Workflow | Fichero | Cadencia | Estado |
