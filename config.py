@@ -261,6 +261,62 @@ MEDIOS = {
         # Patrón: /articulo/{cat}/{slug}/{timestamp+id}.html
         "html_url_regex": r"https://www\.lavozdefuerteventura\.com/articulo/[\w-]+/[\w-]+/\d+\.html",
     },
+    # ── Agencias y radiotelevisión pública ───────────────────────────────────
+    # No son diarios: una agencia alimenta a las demás cabeceras, así que su
+    # agenda es un antecedente del resto, no un competidor. Conviene tenerlo en
+    # cuenta al leer la matriz de convergencia: la correlación de una cabecera
+    # con EFE o Europa Press no significa lo mismo que con otro diario.
+    "europapress": {
+        "nombre":  "Europa Press Canarias",
+        "color":   "#607d8b",
+        "url":     "https://www.europapress.es/islas-canarias/",
+        "rss": [
+            # Canal 287 = Islas Canarias, declarado por la propia portada.
+            "https://www.europapress.es/rss/rss.aspx?ch=287",
+        ],
+        "tipo": "rss+html",
+        "selectores": {
+            "titular": "h2 a",
+            "resumen": "",
+        },
+        # Las piezas viven en /islas-canarias/noticia-…; el resto de la portada
+        # son enlaces a las ediciones nacional e internacional.
+        "html_url_regex": r"/islas-canarias/noticia-",
+    },
+    "efe": {
+        "nombre":  "EFE Canarias",
+        "color":   "#455a64",
+        "url":     "https://efe.com/canarias/",
+        "rss": [],   # efe.com/feed y /canarias/feed no responden
+        "tipo": "html_only",
+        "selectores": {
+            "titular": "h2 a",
+            "resumen": "",
+        },
+        # La fecha va en la ruta (/canarias/2026-09-11/…), así que estas piezas
+        # tienen fecha real sin descargar el artículo.
+        "html_url_regex": r"efe\.com/canarias/",
+        "html_url_excludes": ["/canarias/page/", "/tag/", "/autor/"],
+    },
+    "rtvc": {
+        "nombre":  "RTVC",
+        "color":   "#00acc1",
+        "url":     "https://rtvc.es/",
+        "rss": [],   # rtvc.es/feed no responde
+        "tipo": "html_only",
+        # Los titulares de portada cuelgan de h3; h2 recoge los dos destacados.
+        "selectores": {
+            "titular": "h3 a, h2 a",
+            "resumen": "",
+        },
+        # Las piezas son slugs en la raíz, con la fecha en palabras al final
+        # (…-11-septiembre-2026). Lo que se excluye son páginas de sección,
+        # etiquetas y servicios, que no son piezas.
+        "html_url_excludes": [
+            "/cat/", "/tag/", "/programas/", "/directo", "/tiempo-en-canarias/",
+            "/responsabilidad-social-corporativa/", "/parrilla", "/podcast",
+        ],
+    },
 }
 
 # ── Temáticas y diccionarios de palabras clave ────────────────────────────────

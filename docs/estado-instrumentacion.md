@@ -1,6 +1,6 @@
 # Estado verificado de la instrumentación
 
-**Última verificación:** 11 de septiembre de 2026
+**Última verificación:** 11 de septiembre de 2026 (alta de agencias y RTVC)
 **Verificado contra:** árbol de trabajo de `medios-odesocan` (rama `claude/admiring-fermat-dv7g64`) y proyecto Supabase `bd_odesocan` (`kdpsjutsgvghdtzoskkg`).
 
 Este documento acompaña a [`CUADERNO_METODOLOGICO.md`](CUADERNO_METODOLOGICO.md).
@@ -110,7 +110,7 @@ sellado y antes de la primera tirada del régimen nuevo.
 | Piezas sin tema | 239 (1,7 %), todas del 16 al 19 de marzo |
 | Fecha fiable (`fecha_pub_origen` no sintética) | 0 |
 | Con `texto_full` | 10.639 (77,3 %) |
-| Cabeceras con datos | 12 de 14 configuradas |
+| Cabeceras con datos | 12 de las 14 configuradas entonces (hoy son 17) |
 | Temas por pieza | 1,236 |
 | Filas en `medios.observaciones` | 0 |
 | Filas en `medios.wordcloud_terms` | 0 antes de la reconstrucción del 2026-09-11 (ver apartado 6) |
@@ -136,11 +136,42 @@ cabeceras confunde el marco con la calidad de extracción.
 | lancelotdigital | 566 | 100,0 | 0 |
 | elhierrohoy | 273 | **0,0** | 0 |
 
-`elpueblocanario` y `canariasnoticias` siguen sin ninguna pieza: el universo
-efectivo es 12, no 15 ni 17. El cuaderno declara 17 cabeceras, dos agencias y
-RTVC; `config.py` tiene 14 y ninguna fuente de tipo API. Además,
-`noticias.fuente` tiene un `CHECK` que solo admite `'rss'` y `'html'`: añadir
-una API exige tocar la restricción.
+`elpueblocanario` y `canariasnoticias` siguen sin ninguna pieza. El universo
+efectivo de esa auditoría es 12.
+
+### Alta de EFE, Europa Press y RTVC (2026-09-11)
+
+El cuaderno declaraba 17 cabeceras desde su primera edición, pero tres no
+existían en `config.py`. Ya están, y con esto el universo declarado y el
+configurado coinciden: **17**.
+
+| Cabecera | Fuente | Piezas en la prueba | Con tema | Fecha real |
+|---|---|---|---|---|
+| Europa Press Canarias | RSS (canal 287) + portada | 20 | 10 | 9 del feed, 11 de la URL |
+| EFE Canarias | Portada | 10 | 6 | 6 de la URL, 3 del artículo |
+| RTVC | Portada | 50 | 14 | 28 de la URL, 3 del artículo |
+
+Tres cosas que conviene saber antes de usarlas:
+
+- **RTVC no entra por API, aunque el cuaderno lo diga.** Su WordPress expone
+  `/wp-json/wp/v2/posts`, pero fuerza un solo post por petición e ignora la
+  paginación: `per_page=100` devuelve uno, y `page=2` devuelve el mismo. Sacar
+  cincuenta piezas costaría cincuenta peticiones. Entra por portada, como las
+  demás, y por eso su `fuente` es `html` y no `api`. La restricción `CHECK` de
+  `noticias.fuente` se queda como está.
+- **RTVC escribe la fecha en palabras** dentro del slug
+  (`…-11-septiembre-2026`). El extractor de R4 ya la lee, así que 28 de sus 50
+  piezas tienen fecha real sin descargar nada. Las que no la llevan, sobre todo
+  recetas y deportes, se quedan con marca sintética declarada.
+- **Una agencia no es un diario.** EFE y Europa Press alimentan a las demás
+  cabeceras, de modo que su agenda es un antecedente de la del resto, no un
+  competidor. En la matriz de convergencia, una correlación alta con ellas
+  significa otra cosa que una correlación alta con otro diario, y conviene
+  decirlo al interpretarla.
+
+La extracción de texto completo de EFE no devolvió cuerpo en la prueba local,
+donde falta `newspaper3k`. Hay que comprobarlo en la primera tirada real, porque
+de ello depende que EFE sirva para análisis de encuadre.
 
 ## 5 · Deriva del clasificador, y sellado del corpus
 
