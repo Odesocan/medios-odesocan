@@ -33,7 +33,12 @@ permissions:
 jobs:
   scraping:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Treinta minutos bastaban con 14 cabeceras y cuota de 20-30 piezas. Desde
+    # R1 las portadas se recorren enteras y son 17 cabeceras, así que una tirada
+    # ronda la media hora solo de raspado, sin contar la preparación del runner.
+    # Si el job muere por tiempo, muere ANTES de sincronizar: se pierde la
+    # tirada entera, observaciones incluidas.
+    timeout-minutes: 60
  
     env:
       SUPABASE_HOST:     ${{ secrets.SUPABASE_HOST }}
