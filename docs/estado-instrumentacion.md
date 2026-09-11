@@ -169,9 +169,32 @@ Tres cosas que conviene saber antes de usarlas:
   significa otra cosa que una correlación alta con otro diario, y conviene
   decirlo al interpretarla.
 
-La extracción de texto completo de EFE no devolvió cuerpo en la prueba local,
-donde falta `newspaper3k`. Hay que comprobarlo en la primera tirada real, porque
-de ello depende que EFE sirva para análisis de encuadre.
+### Lo que salió al ponerlas en producción (2026-09-11)
+
+- **EFE se quedó a cero en la primera tirada completa.** Devolvió un `429 Too
+  Many Requests` al runner de Actions, y el cliente no reintentaba ningún 4xx.
+  Un 429 no dice «esto no existe», dice «vuelve más tarde», así que ahora 429 y
+  503 se reintentan respetando la cabecera `Retry-After`, con un tope de 60
+  segundos. Comprobado en vivo: en la tirada siguiente EFE volvió a recibir un
+  429 a mitad de faena, esperó y recuperó la pieza.
+- **El parámetro `medio` del workflow era decorativo:** `scheduler.py --run-now`
+  lo ignoraba, de modo que no había manera de relanzar una sola cabecera.
+  Ahora funciona, admite varias separadas por comas y una errata falla al
+  instante en vez de perderse en el log.
+- **El orden de los selectores de cuerpo estaba al revés.** La heurística
+  empezaba por la etiqueta `<article>`, pero muchas plantillas envuelven en
+  `<article>` también las tarjetas de portada y los directos. EFE no rendía
+  cuerpo porque el suyo vive en un `post-content` de WordPress, y RTVC rendía el
+  rótulo «En Directo | …» repetido en lugar del artículo. Ahora van primero los
+  contenedores con nombre propio. Comprobado sobre piezas reales: para
+  Canarias7, El Día, La Provincia y Atlántico Hoy el texto extraído es idéntico
+  antes y después.
+
+Queda una secuela en los datos: **las 14 piezas de RTVC con texto de la primera
+tirada lo tienen contaminado** con esa navegación. Ninguna otra cabecera está
+afectada. Hasta que se limpien o se vuelvan a extraer, conviene excluirlas de
+cualquier análisis léxico: se reconocen porque su `texto_full` repite
+«En Directo |».
 
 ## 5 · Deriva del clasificador, y sellado del corpus
 

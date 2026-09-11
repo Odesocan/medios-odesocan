@@ -1095,9 +1095,18 @@ def texto_desde_html(html: str, url: str) -> Optional[str]:
 
     # Fallback: heurística con BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
+    # El orden importa y no es el obvio: primero los contenedores con nombre
+    # propio, y solo después la etiqueta <article>. Muchas plantillas envuelven
+    # en <article> tanto la pieza como las tarjetas de portada o los directos,
+    # así que empezar por ahí devuelve navegación con aspecto de texto. RTVC
+    # rendía el rótulo «En Directo | …» repetido en vez del cuerpo, y EFE no
+    # rendía nada porque su cuerpo vive en un `post-content` de WordPress.
+    # Comprobado sobre piezas reales: para Canarias7, El Día, La Provincia y
+    # Atlántico Hoy el texto extraído es idéntico en ambos órdenes.
     for selector in [
-        "article", "[class*='article-body']", "[class*='entry-content']",
-        "[class*='news-body']", "main", ".content",
+        "[class*='article-body']", "[class*='entry-content']",
+        "[class*='news-body']", "[class*='post-content']",
+        "article", "main", ".content",
     ]:
         nodo = soup.select_one(selector)
         if nodo:
