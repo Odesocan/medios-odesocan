@@ -113,7 +113,7 @@ sellado y antes de la primera tirada del régimen nuevo.
 | Cabeceras con datos | 12 de 14 configuradas |
 | Temas por pieza | 1,236 |
 | Filas en `medios.observaciones` | 0 |
-| Filas en `medios.wordcloud_terms` | 0 |
+| Filas en `medios.wordcloud_terms` | 0 antes de la reconstrucción del 2026-09-11 (ver apartado 6) |
 
 ### Cobertura de texto completo por cabecera
 
@@ -195,19 +195,61 @@ Consecuencia para cualquier cifra ya publicada sobre la ventana del 16 al 19 de
 marzo: cambia un poco. Economía gana 92 etiquetas en el corpus, y política y
 medio ambiente pierden 37 y 33.
 
-## 6 · Qué queda por hacer
+## 6 · El agregado léxico estaba vaciándose solo
 
-1. **Reconstruir el agregado léxico**, hoy a cero filas, para que el segundo
-   nivel de agenda vuelva a ser calculable y estrene el corte mensual.
-2. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
+La tabla no estaba «sin construir»: estaba **siendo vaciada todos los días**.
+
+El job `Build Wordcloud Terms` corrió en verde hasta el 2026-09-06 y falló los
+cuatro días siguientes con el mismo error de PostgREST:
+
+```
+42P10 there is no unique or exclusion constraint matching the ON CONFLICT specification
+```
+
+La tabla había ganado la columna `periodo` en su clave primaria (R5), y el
+`on_conflict` del script seguía nombrando la clave de tres columnas. Como el
+script **trunca la tabla antes de insertar**, cada ejecución diaria la dejaba a
+cero y moría. Desde el 7 de septiembre, la nube de palabras del dashboard venía
+cayendo a su cálculo de respaldo en cliente sobre titulares, que es peor: no
+pondera el artículo completo.
+
+El arreglo va en este mismo cambio, junto con el corte mensual. Reconstruido el
+2026-09-11 sobre las 13.522 piezas con tema:
+
+| Periodo | Filas | Ámbitos | Piezas |
+|---|---|---|---|
+| `__all__` | 14.076 | 202 | 13.522 |
+| 2026-03 | 6.760 | 93 | 1.168 |
+| 2026-04 | 8.942 | 122 | 2.674 |
+| 2026-05 | 9.199 | 127 | 2.796 |
+| 2026-06 | 9.352 | 132 | 2.824 |
+| 2026-07 | 9.005 | 126 | 2.531 |
+| 2026-08 | 4.390 | 61 | 609 |
+| 2026-09 | 5.812 | 85 | 920 |
+| **Total** | **67.536** | | |
+
+Dos advertencias antes de usar estos cortes para una serie de atributos:
+
+- **Los meses no son comparables en volumen.** Agosto tiene 609 piezas y junio
+  2.824. Eso no mide la actividad de la prensa canaria: mide cuántas tiradas del
+  scraper salieron bien ese mes. Comparar vocabulario entre meses sí vale;
+  comparar cuántos términos tiene cada mes, no.
+- **El umbral de ámbito sigue siendo laxo.** El pipeline conserva 80 términos
+  por ámbito con que aparezcan en 2 documentos, y solo descarta los ámbitos
+  mensuales por debajo de 5 piezas. Para análisis, el cuaderno recomienda
+  filtrar por `n_noticias` por debajo de unas 30.
+
+## 7 · Qué queda por hacer
+
+1. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
    técnica, y el volumen de peticiones se ha multiplicado por cuatro.
-3. **Diagnosticar o retirar las dos cabeceras muertas**, para que el universo
+2. **Diagnosticar o retirar las dos cabeceras muertas**, para que el universo
    declarado y el efectivo coincidan.
-4. **Vigilar el crecimiento**: del orden de 1.500 filas diarias de noticias más
+3. **Vigilar el crecimiento**: del orden de 1.500 filas diarias de noticias más
    las observaciones. Si la cuota de Supabase se agota, el pipeline falla en
    silencio, porque `scheduler.py` captura las excepciones sin propagarlas.
 
-## 7 · Aviso de seguridad pendiente
+## 8 · Aviso de seguridad pendiente
 
 El asesor de Supabase marca como crítico que `medios.frecuencias_lexicas`
 tiene **Row Level Security deshabilitada**: cualquiera con la *anon* key
@@ -221,7 +263,7 @@ todo acceso. Decisión del equipo, no automática.
 ALTER TABLE "medios"."frecuencias_lexicas" ENABLE ROW LEVEL SECURITY;
 ```
 
-## 8 · Cómo repetir esta verificación
+## 9 · Cómo repetir esta verificación
 
 ```bash
 python -m unittest discover -s tests -v      # el plano del código
