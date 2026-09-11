@@ -247,9 +247,10 @@ Cualquier consulta al agregado tiene que filtrar por `periodo` desde ahora: sin
 consulta de `index.html` pedía solo por `scope_key`, y se ha corregido en esta
 rama para que pida `periodo = '__all__'`.
 
-**Mientras la rama no se integre, el dashboard servido desde `main` sigue sin el
-filtro,** y el efecto no es teórico. Reproduciendo su consulta sobre la tabla ya
-reconstruida:
+**Resuelto el 2026-09-11:** esa línea se llevó a `main` por separado (commit
+`8742e28`), sin arrastrar el resto de la rama, y Pages volvió a desplegar. El
+efecto que tenía no era teórico. Reproduciendo la consulta anterior sobre la
+tabla ya reconstruida:
 
 | | |
 |---|---|
@@ -257,13 +258,12 @@ reconstruida:
 | Filas intrusas en total | 357 |
 | Peor caso (`medio:canarias7\|tema:diversidad`) | 16 de 55 palabras |
 
-Son casi la mitad de los ámbitos, y los peores son justamente los de medio ×
-tema, que es donde vive el segundo nivel de agenda. El acumulado global apenas
-se ve afectado, porque sus puntuaciones son mucho mayores que las de cualquier
-mes.
+Eran casi la mitad de los ámbitos, y los peores los de medio × tema, que es
+donde vive el segundo nivel de agenda. El acumulado global apenas se veía
+afectado, porque sus puntuaciones son mucho mayores que las de cualquier mes.
 
-Se arregla de dos maneras: integrando esta rama, o llevando a `main` esa única
-línea de `index.html`.
+Comprobado contra la API ya con el filtro: los dos peores ámbitos pasan de 16 y
+15 términos repetidos en sus 55 palabras a ninguno.
 
 ## 7 · Qué queda por hacer
 
