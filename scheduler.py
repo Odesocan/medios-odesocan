@@ -31,6 +31,7 @@ import time
 
 import schedule
 
+from config import MEDIOS
 from scraper import scrapear_todos
 from supabase_loader import sincronizar, sincronizar_log, sincronizar_observaciones
 
@@ -50,11 +51,35 @@ def configurar_logging() -> None:
     )
 
 
-def job() -> None:
+def medios_solicitados(valor: str | None) -> list[str] | None:
+    """
+    Traduce el parámetro `medio` a la lista que espera el scraper.
+
+    Acepta vacío (todas las cabeceras), una sola o varias separadas por comas.
+    Una cabecera inexistente es un error inmediato y no un aviso perdido en el
+    log: si alguien relanza «rtcv» por una errata, más vale que lo sepa antes
+    de esperar quince minutos a una tirada vacía.
+    """
+    if not valor or not valor.strip():
+        return None
+    pedidos = [parte.strip() for parte in valor.split(",") if parte.strip()]
+    desconocidos = [m for m in pedidos if m not in MEDIOS]
+    if desconocidos:
+        raise ValueError(
+            "Cabeceras desconocidas: " + ", ".join(desconocidos)
+            + ". Las configuradas son: " + ", ".join(sorted(MEDIOS))
+        )
+    return pedidos or None
+
+
+def job(medios: list[str] | None = None) -> None:
     configurar_logging()
-    log.info("▶ Ejecutando scraping programado…")
+    if medios:
+        log.info("▶ Ejecutando scraping programado — solo %s", ", ".join(medios))
+    else:
+        log.info("▶ Ejecutando scraping programado…")
     try:
-        resultados = scrapear_todos(dry_run=False, extraer_articulos=True)
+        resultados = scrapear_todos(dry_run=False, extraer_articulos=True, medios=medios)
         nuevas = sum(r.get("nuevas", 0) for r in resultados)
         log.info("✓ Scraping completado — %d noticias nuevas", nuevas)
     except Exception as e:
@@ -106,12 +131,26 @@ if __name__ == "__main__":
         action="store_true",
         help="Ejecuta scraping + sync inmediatamente y termina",
     )
+    parser.add_argument(
+        "--medio",
+        default="",
+        help="Cabecera concreta, o varias separadas por comas (vacío = todas). "
+             "Sirve para relanzar una que falló sin repetir la tirada entera.",
+    )
     args = parser.parse_args()
+
+    try:
+        seleccion = medios_solicitados(args.medio)
+    except ValueError as e:
+        parser.error(str(e))
 
     if args.run_now:
         log.info("Ejecución manual inmediata del scheduler")
-        job()
+        job(medios=seleccion)
         raise SystemExit(0)
+
+    if seleccion:
+        log.warning("--medio solo se aplica con --run-now; el modo daemon recorre todas")
 
     log.info("Scheduler iniciado en modo headless. No lanza el dashboard. Ctrl+C para detener.")
 

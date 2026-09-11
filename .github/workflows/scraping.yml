@@ -23,7 +23,7 @@ on:
   workflow_dispatch:   # Permite ejecución manual desde la UI de GitHub Actions
     inputs:
       medio:
-        description: "Medio específico a scrapear (vacío = todos)"
+        description: "Cabecera concreta, o varias separadas por comas (vacío = todas)"
         required: false
         default: ""
  
@@ -83,7 +83,18 @@ jobs:
         run: python -m spacy download es_core_news_md
  
       - name: Ejecutar scraping + sync + dashboard
-        run: python scheduler.py --run-now
+        # El parámetro llega por variable de entorno y entrecomillado, no
+        # interpolado en la orden: lo escribe quien lanza el workflow, y
+        # meterlo tal cual en el shell sería una vía de inyección.
+        env:
+          MEDIO: ${{ inputs.medio }}
+        run: |
+          if [ -n "$MEDIO" ]; then
+            echo "Tirada limitada a: $MEDIO"
+            python scheduler.py --run-now --medio "$MEDIO"
+          else
+            python scheduler.py --run-now
+          fi
  
       - name: Commit y push del dashboard actualizado
         run: |

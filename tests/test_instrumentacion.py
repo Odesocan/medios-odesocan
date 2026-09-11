@@ -13,6 +13,7 @@ import importlib.util
 import json
 import sqlite3
 import sys
+import types
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,6 +22,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
 import scraper                                   # noqa: E402
+from datetime import datetime, timezone           # noqa: E402
 from clasificador import CLASIFICADOR_VERSION, version_clasificador   # noqa: E402
 from config import SCRAPER                       # noqa: E402
 
@@ -471,3 +473,67 @@ class ConfiguracionDeMedios(unittest.TestCase):
         etiquetas = set(_re.findall(r"(\w+): '", bloque("const LM = {", "const LT = {")))
         self.assertEqual(set(self.medios) - colores, set(), "cabeceras sin color")
         self.assertEqual(set(self.medios) - etiquetas, set(), "cabeceras sin etiqueta")
+
+
+class ReintentoDelRechazo(unittest.TestCase):
+    """
+    Un 429 no es un 404: dice «vuelve más tarde». Tratarlos igual dejó a EFE a
+    cero piezas en la primera tirada completa.
+    """
+
+    class _Respuesta:
+        def __init__(self, retry_after=None):
+            self.headers = {} if retry_after is None else {"retry-after": retry_after}
+
+    def test_el_429_se_reintenta_y_el_404_no(self):
+        self.assertIn(429, scraper.CODIGOS_REINTENTABLES)
+        self.assertIn(503, scraper.CODIGOS_REINTENTABLES)
+        for codigo in (400, 403, 404, 410):
+            self.assertNotIn(codigo, scraper.CODIGOS_REINTENTABLES)
+
+    def test_retry_after_en_segundos(self):
+        self.assertEqual(scraper.segundos_retry_after(self._Respuesta("120")), 120.0)
+        self.assertEqual(scraper.segundos_retry_after(self._Respuesta("0")), 0.0)
+
+    def test_retry_after_como_fecha(self):
+        from datetime import timedelta
+        from email.utils import format_datetime
+        futuro = datetime.now(timezone.utc) + timedelta(seconds=90)
+        segundos = scraper.segundos_retry_after(self._Respuesta(format_datetime(futuro)))
+        self.assertAlmostEqual(segundos, 90, delta=5)
+
+    def test_una_cabecera_ilegible_no_rompe_nada(self):
+        for valor in (None, "", "   ", "cuando pueda", "-5"):
+            resultado = scraper.segundos_retry_after(self._Respuesta(valor))
+            self.assertTrue(resultado is None or resultado >= 0, valor)
+
+    def test_la_espera_del_servidor_tiene_tope(self):
+        """Un Retry-After de una hora colgaría el job hasta que lo maten."""
+        self.assertLessEqual(scraper.ESPERA_MAXIMA_SERVIDOR, 120)
+
+
+class SeleccionDeCabeceras(unittest.TestCase):
+    """El parámetro `medio` del workflow tiene que llegar de verdad al scraper."""
+
+    def setUp(self):
+        import importlib.util
+        if "schedule" not in sys.modules:      # dependencia del daemon, no del test
+            sys.modules["schedule"] = types.ModuleType("schedule")
+        spec = importlib.util.spec_from_file_location("scheduler_bajo_prueba",
+                                                      RAIZ / "scheduler.py")
+        self.sch = importlib.util.module_from_spec(spec)
+        sys.modules["scheduler_bajo_prueba"] = self.sch
+        spec.loader.exec_module(self.sch)
+
+    def test_vacio_significa_todas(self):
+        self.assertIsNone(self.sch.medios_solicitados(""))
+        self.assertIsNone(self.sch.medios_solicitados(None))
+        self.assertIsNone(self.sch.medios_solicitados("   "))
+
+    def test_una_o_varias(self):
+        self.assertEqual(self.sch.medios_solicitados("efe"), ["efe"])
+        self.assertEqual(self.sch.medios_solicitados(" efe , rtvc "), ["efe", "rtvc"])
+
+    def test_una_errata_es_un_error_inmediato(self):
+        with self.assertRaises(ValueError):
+            self.sch.medios_solicitados("rtcv")
