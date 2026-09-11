@@ -190,11 +190,15 @@ Tres cosas que conviene saber antes de usarlas:
   Canarias7, El Día, La Provincia y Atlántico Hoy el texto extraído es idéntico
   antes y después.
 
-Queda una secuela en los datos: **las 14 piezas de RTVC con texto de la primera
-tirada lo tienen contaminado** con esa navegación. Ninguna otra cabecera está
-afectada. Hasta que se limpien o se vuelvan a extraer, conviene excluirlas de
-cualquier análisis léxico: se reconocen porque su `texto_full` repite
-«En Directo |».
+La secuela en los datos está resuelta: **las 14 piezas de RTVC que habían
+guardado navegación se volvieron a descargar** el 2026-09-11 con el extractor
+corregido, y ya tienen el cuerpo real, de 1.181 a 3.759 caracteres y 2.339 de
+media. Ninguna conserva el rastro «En Directo |», y ninguna otra cabecera estaba
+afectada.
+
+El agregado léxico no arrastra ese ruido: se reconstruyó a las 13:57, antes de
+que esas piezas entraran en el corpus. Lo que sí es que todavía no incluye las
+840 piezas del régimen nuevo, y las incorporará en su reconstrucción diaria.
 
 ## 5 · Deriva del clasificador, y sellado del corpus
 
