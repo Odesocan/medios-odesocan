@@ -239,6 +239,19 @@ Dos advertencias antes de usar estos cortes para una serie de atributos:
   mensuales por debajo de 5 piezas. Para análisis, el cuaderno recomienda
   filtrar por `n_noticias` por debajo de unas 30.
 
+### El dashboard publicado necesita el filtro de periodo
+
+Cualquier consulta al agregado tiene que filtrar por `periodo` desde ahora: sin
+él, la misma palabra vuelve hasta nueve veces por ámbito, una por corte. La
+consulta de `index.html` pedía solo por `scope_key`, y se ha corregido en esta
+rama para que pida `periodo = '__all__'`.
+
+**Mientras la rama no se integre, el dashboard servido desde `main` sigue sin el
+filtro.** No se rompe, pero su nube de palabras puede repetir términos y
+dibujarlos con pesos que no son los de la escala, sobre todo en los ámbitos
+pequeños de medio × tema, donde el acumulado y el mes tienen puntuaciones
+parecidas.
+
 ## 7 · Qué queda por hacer
 
 1. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
