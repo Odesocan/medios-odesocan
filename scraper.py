@@ -491,6 +491,19 @@ _PATRONES_FECHA_URL = (
     re.compile(r"(?<!\d)(\d{4})(\d{2})(\d{2})\d{6}(?!\d)"),    # sello de 14 dígitos
 )
 
+# Algunas cabeceras escriben la fecha en palabras dentro del slug, no en
+# cifras: RTVC publica /…-11-septiembre-2026/. Es la misma vía barata de R4 —no
+# cuesta ninguna petición, así que sirve también para el denominador— y la misma
+# precisión de día.
+_MESES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+    "julio": 7, "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10,
+    "noviembre": 11, "diciembre": 12,
+}
+_PATRON_FECHA_PALABRAS = re.compile(
+    r"[-/](\d{1,2})-(" + "|".join(_MESES) + r")-(\d{4})(?![0-9a-z])"
+)
+
 _META_FECHA = (
     ("property", "article:published_time"),
     ("property", "og:published_time"),
@@ -544,6 +557,15 @@ def fecha_desde_url(url: str) -> Optional[str]:
             return datetime(anio, mes, dia, tzinfo=timezone.utc).isoformat()
         except ValueError:
             continue   # 2026/13/40 y demás: no era una fecha
+
+    m = _PATRON_FECHA_PALABRAS.search(ruta.lower())
+    if m:
+        dia, mes_texto, anio = int(m.group(1)), m.group(2), int(m.group(3))
+        if 2000 <= anio <= limite:
+            try:
+                return datetime(anio, _MESES[mes_texto], dia, tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                pass
     return None
 
 

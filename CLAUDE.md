@@ -37,9 +37,12 @@ Valen tanto para el análisis en R como para cualquier cifra que se publique.
 3. **Declarar siempre el denominador**: producción total de la cabecera, o
    agenda temática de ODESOCAN. Son dos cuotas distintas. Hoy solo es calculable
    la segunda.
-4. **Nunca comparar volúmenes brutos entre cabeceras.** Las cuotas de raspado
-   son desiguales (30/25/20), así que el volumen mide la configuración del
-   raspador. Solo son comparables las distribuciones internas.
+4. **Nunca comparar volúmenes brutos entre cabeceras.** En el tramo antiguo las
+   cuotas de raspado eran desiguales (30/25/20), así que el volumen medía la
+   configuración del raspador. Solo son comparables las distribuciones internas.
+   Y desde el alta de EFE, Europa Press y RTVC, recordar que **una agencia no es
+   un diario**: su agenda alimenta a las demás, así que una convergencia alta
+   con ellas no se interpreta como entre dos cabeceras que compiten.
 5. **La agenda del sistema es la media no ponderada de las cuotas por cabecera**,
    nunca la agregación de piezas.
 6. **`fecha_scrap` no es fecha de publicación.** Codifica el orden del
@@ -73,7 +76,7 @@ de códigos y α obtenida. Citar el commit concreto.
 
 | Fichero | Función |
 |---|---|
-| `config.py` | `MEDIOS` (14 cabeceras), `TEMAS` (15), `SCRAPER`, `USER_AGENTS` |
+| `config.py` | `MEDIOS` (17 cabeceras, dos agencias y RTVC incluidas), `TEMAS` (15), `SCRAPER`, `USER_AGENTS` |
 | `scraper.py` | Recolección RSS + HTML, extracción de texto, SQLite efímero |
 | `clasificador.py` | Clasificación híbrida multietiqueta (keywords, lemas, URL, spaCy) |
 | `supabase_loader.py` | Sincronización con `medios.noticias` por `psycopg2` |

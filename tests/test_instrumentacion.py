@@ -418,3 +418,56 @@ class FechasDeFeed(unittest.TestCase):
             scraper._iso_o_none("2026-09-07T10:00:00Z"),
             scraper._iso_o_none("2026-09-07T12:00:00+02:00"),
         )
+
+
+class FechaEnPalabras(unittest.TestCase):
+    """RTVC escribe la fecha en palabras dentro del slug, no en cifras."""
+
+    def test_el_mes_en_palabras_cuenta_como_fecha_de_url(self):
+        fecha = scraper.fecha_desde_url(
+            "https://rtvc.es/cerrada-bano-playa-cabezo-guimar-11-septiembre-2026/")
+        self.assertTrue(fecha.startswith("2026-09-11"), fecha)
+        self.assertTrue(scraper.fecha_desde_url(
+            "https://rtvc.es/algo-1-enero-2026/").startswith("2026-01-01"))
+
+    def test_no_inventa_fechas_imposibles(self):
+        for url in ("https://rtvc.es/cadiz-cf-vs-ud-las-palmas-j5-laliga-26-27/",
+                    "https://rtvc.es/algo-32-septiembre-2026/",
+                    "https://rtvc.es/algo-11-brumario-2026/"):
+            self.assertIsNone(scraper.fecha_desde_url(url), url)
+
+
+class ConfiguracionDeMedios(unittest.TestCase):
+    """
+    El universo declarado tiene que ser el que el pipeline sabe recorrer, y el
+    que el dashboard sabe nombrar. Una cabecera mal configurada no falla: rinde
+    cero en silencio, que es peor.
+    """
+
+    def setUp(self):
+        from config import MEDIOS
+        self.medios = MEDIOS
+
+    def test_cada_cabecera_esta_completa(self):
+        import re as _re
+        for medio, cfg in self.medios.items():
+            with self.subTest(medio=medio):
+                for clave in ("nombre", "color", "url", "tipo", "rss"):
+                    self.assertIn(clave, cfg)
+                self.assertIn(cfg["tipo"], ("rss_only", "html_only", "rss+html"))
+                if cfg["tipo"] in ("html_only", "rss+html"):
+                    self.assertTrue(cfg.get("selectores", {}).get("titular"),
+                                    "sin selector de titular no se raspa la portada")
+                if cfg["tipo"] in ("rss_only", "rss+html"):
+                    self.assertTrue(cfg["rss"], "declara RSS pero no da ninguno")
+                if cfg.get("html_url_regex"):
+                    _re.compile(cfg["html_url_regex"])   # que no reviente en producción
+
+    def test_el_dashboard_nombra_todas_las_cabeceras(self):
+        html = (RAIZ / "index.html").read_text(encoding="utf-8")
+        import re as _re
+        bloque = lambda ini, fin: html[html.index(ini):html.index(fin)]
+        colores = set(_re.findall(r"(\w+): '#", bloque("const MEDIO_COLORS", "const TEMA_COLORS")))
+        etiquetas = set(_re.findall(r"(\w+): '", bloque("const LM = {", "const LT = {")))
+        self.assertEqual(set(self.medios) - colores, set(), "cabeceras sin color")
+        self.assertEqual(set(self.medios) - etiquetas, set(), "cabeceras sin etiqueta")

@@ -591,7 +591,13 @@ const MEDIO_COLORS = {
   canarias7: '#1a5fa8', laprovincia: '#d63b2f', eldia: '#2e7d32',
   laopinion: '#e65100', diariodeavisos: '#6a1b9a', atlanticohoy: '#00695c',
   canariasahora: '#c62828', elhierrohoy: '#5d4037', lancelotdigital: '#bf360c',
-  eltime: '#d4a017', lavozdefuerteventura: '#0d47a1', gomeraverde: '#33691e'
+  eltime: '#d4a017', lavozdefuerteventura: '#0d47a1', gomeraverde: '#33691e',
+  // Agencias y radiotelevisión pública, en gama fría para distinguirlas de los
+  // diarios de un vistazo: su agenda alimenta a las demás, no compite con ellas.
+  efe: '#455a64', europapress: '#607d8b', rtvc: '#00acc1',
+  // Configuradas pero sin una sola pieza desde marzo. Se nombran para que
+  // config.py y el dashboard no diverjan; si alguna revive, ya tiene color.
+  elpueblocanario: '#00838f', canariasnoticias: '#558b2f'
 };
 const TEMA_COLORS = {
   economia: '#2e7d32', medio_ambiente: '#1b5e20', politica: '#4a148c',
@@ -610,7 +616,9 @@ const LM = {
   atlanticohoy: 'Atlántico Hoy', canariasahora: 'Canarias Ahora',
   elhierrohoy: 'El Hierro Hoy', lancelotdigital: 'Lancelot Digital',
   eltime: 'El Time', lavozdefuerteventura: 'La Voz de Ftv.',
-  gomeraverde: 'Gomera Verde'
+  gomeraverde: 'Gomera Verde', efe: 'EFE Canarias',
+  europapress: 'Europa Press', rtvc: 'RTVC',
+  elpueblocanario: 'El Pueblo Canario', canariasnoticias: 'Canarias Noticias'
 };
 const LT = {
   politica: 'Política', medio_ambiente: 'Medio Amb.', economia: 'Economía',
