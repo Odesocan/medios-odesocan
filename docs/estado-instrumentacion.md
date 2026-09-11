@@ -214,7 +214,8 @@ cayendo a su cálculo de respaldo en cliente sobre titulares, que es peor: no
 pondera el artículo completo.
 
 El arreglo va en este mismo cambio, junto con el corte mensual. Reconstruido el
-2026-09-11 sobre las 13.522 piezas con tema:
+2026-09-11 desde Actions sobre la rama (run 79, en verde), con las 13.521 piezas
+con tema que producen términos:
 
 | Periodo | Filas | Ámbitos | Piezas |
 |---|---|---|---|
@@ -247,10 +248,22 @@ consulta de `index.html` pedía solo por `scope_key`, y se ha corregido en esta
 rama para que pida `periodo = '__all__'`.
 
 **Mientras la rama no se integre, el dashboard servido desde `main` sigue sin el
-filtro.** No se rompe, pero su nube de palabras puede repetir términos y
-dibujarlos con pesos que no son los de la escala, sobre todo en los ámbitos
-pequeños de medio × tema, donde el acumulado y el mes tienen puntuaciones
-parecidas.
+filtro,** y el efecto no es teórico. Reproduciendo su consulta sobre la tabla ya
+reconstruida:
+
+| | |
+|---|---|
+| Ámbitos cuyo top 55 cuela filas de cortes mensuales | 96 de 202 |
+| Filas intrusas en total | 357 |
+| Peor caso (`medio:canarias7\|tema:diversidad`) | 16 de 55 palabras |
+
+Son casi la mitad de los ámbitos, y los peores son justamente los de medio ×
+tema, que es donde vive el segundo nivel de agenda. El acumulado global apenas
+se ve afectado, porque sus puntuaciones son mucho mayores que las de cualquier
+mes.
+
+Se arregla de dos maneras: integrando esta rama, o llevando a `main` esa única
+línea de `index.html`.
 
 ## 7 · Qué queda por hacer
 
