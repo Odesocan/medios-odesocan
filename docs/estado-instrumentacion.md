@@ -1,6 +1,6 @@
 # Estado verificado de la instrumentación
 
-**Última verificación:** 10 de septiembre de 2026
+**Última verificación:** 11 de septiembre de 2026
 **Verificado contra:** árbol de trabajo de `medios-odesocan` (rama `claude/admiring-fermat-dv7g64`) y proyecto Supabase `bd_odesocan` (`kdpsjutsgvghdtzoskkg`).
 
 Este documento acompaña a [`CUADERNO_METODOLOGICO.md`](CUADERNO_METODOLOGICO.md).
@@ -9,9 +9,18 @@ El cuaderno describe el instrumento previsto; esto describe el que hay.
 ## Diagnóstico en una frase
 
 Los cinco cambios R1–R5 están **implementados en el código y presentes en el
-esquema**, pero el tramo nuevo del corpus **no ha empezado**: las 13.761 piezas
-acumuladas siguen siendo todas del régimen antiguo, y lo seguirán siendo hasta
-la primera tirada del pipeline reinstrumentado.
+esquema**, y el corpus histórico está **sellado** con la versión del
+clasificador. Pero el tramo nuevo del corpus **no ha empezado**: las 13.761
+piezas acumuladas siguen sin denominador, sin permanencia, sin posición y sin
+fecha real, y lo seguirán estando hasta la primera tirada del pipeline
+reinstrumentado.
+
+> **Ojo con la prueba de régimen.** El cuaderno dice, en su apartado 2.4, que
+> `clasificador_version IS NULL` identifica el tramo antiguo. Desde el sellado
+> del 11 de septiembre de 2026 eso **ya no es cierto**: las 13.761 piezas
+> antiguas llevan huella. La prueba correcta es ahora
+> `fecha_pub_origen IS NULL`, que el pipeline nuevo escribe siempre, o la
+> ausencia de filas en `medios.observaciones` para esa pieza.
 
 ## 1 · Los tres planos, por separado
 
@@ -19,7 +28,7 @@ la primera tirada del pipeline reinstrumentado.
 |---|---|
 | Esquema Supabase | Régimen nuevo. `noticias.seccion`, `noticias.clasificador_version`, `noticias.fecha_pub_origen`, `medios.observaciones` y `wordcloud_terms.periodo` existen, con sus comentarios de columna, sus índices y su restricción única `(url_hash, run_id)`. |
 | Código del pipeline | Régimen nuevo. R1–R5 implementados y con comprobaciones automáticas en `tests/`. |
-| Corpus | Régimen antiguo al 100 %. Ninguna pieza lleva todavía sello de clasificador, fecha real ni observación de portada. |
+| Corpus | Régimen antiguo al 100 %, pero sellado: las 13.761 piezas llevan la huella `v2-29e00cc2d46f-es_core_news_md`. Ninguna tiene todavía fecha real ni observación de portada. |
 
 ## 2 · Hoja de ruta
 
@@ -27,7 +36,7 @@ la primera tirada del pipeline reinstrumentado.
 |---|---|---|---|---|
 | R1 | Conservar las piezas sin tema | Listo | Listo | `scraper.py` (`guardar_noticia`, bucle de `scrapear_medio`), `supabase_loader.py` |
 | R2 | Registrar posición y permanencia en portada | Listo | Listo | `scraper.py` (`registrar_observacion`), `supabase_loader.py` (`sincronizar_observaciones`) |
-| R3 | Versión del clasificador y reclasificación | Listo | Listo | `clasificador.py` (`version_clasificador`), `scripts/reclasificar.py` |
+| R3 | Versión del clasificador y reclasificación | Listo | Listo, y **aplicado sobre el histórico el 2026-09-11** | `clasificador.py` (`version_clasificador`), `scripts/reclasificar.py` |
 | R4 | Fecha de publicación real y su procedencia | Listo | Listo | `scraper.py` (`fecha_desde_url`, `fecha_desde_html`, `seccion_desde_url`) |
 | R5 | Cadencia sub-diaria y corte temporal del agregado | Listo | Listo | `.github/workflows/scraping.yml`, `scripts/build_wordcloud_terms.py` |
 | R6 | Agrupamiento de piezas por acontecimiento | — | Pendiente | Trabajo de análisis, no de pipeline |
@@ -89,19 +98,20 @@ un factor de esa escala.
 
 ## 4 · Auditoría del corpus
 
-Consulta del apartado 4.3 del cuaderno, ejecutada el 2026-09-10, antes de la
-primera tirada del régimen nuevo.
+Consulta del apartado 4.3 del cuaderno, ejecutada el 2026-09-11, después del
+sellado y antes de la primera tirada del régimen nuevo.
 
 | Métrica | Valor |
 |---|---|
 | Piezas | 13.761 |
 | Ventana | 2026-03-16 → 2026-09-10 |
-| Tramo antiguo (`clasificador_version IS NULL`) | 13.761 (100 %) |
-| Piezas sin tema | 193 (1,4 %) |
+| Tramo antiguo (`fecha_pub_origen IS NULL`) | 13.761 (100 %) |
+| Sin sellar (`clasificador_version IS NULL`) | 0 |
+| Piezas sin tema | 239 (1,7 %), todas del 16 al 19 de marzo |
 | Fecha fiable (`fecha_pub_origen` no sintética) | 0 |
 | Con `texto_full` | 10.639 (77,3 %) |
 | Cabeceras con datos | 12 de 14 configuradas |
-| Temas por pieza | 1,24 |
+| Temas por pieza | 1,236 |
 | Filas en `medios.observaciones` | 0 |
 | Filas en `medios.wordcloud_terms` | 0 |
 
@@ -132,10 +142,11 @@ RTVC; `config.py` tiene 14 y ninguna fuente de tipo API. Además,
 `noticias.fuente` tiene un `CHECK` que solo admite `'rss'` y `'html'`: añadir
 una API exige tocar la restricción.
 
-## 5 · Deriva del clasificador (medida en seco el 2026-09-10)
+## 5 · Deriva del clasificador, y sellado del corpus
 
-`scripts/reclasificar.py` en modo seco, con `es_core_news_md` cargado, sobre las
-13.761 piezas del corpus. Clasificador: `v2-29e00cc2d46f-es_core_news_md`.
+Medida en seco el 2026-09-10 y aplicada el 2026-09-11, con `es_core_news_md`
+cargado, sobre las 13.761 piezas del corpus.
+Clasificador: `v2-29e00cc2d46f-es_core_news_md`.
 
 | | |
 |---|---|
@@ -163,28 +174,36 @@ Dos conclusiones para la ficha técnica:
   construidas sobre el corpus a partir de esa fecha son comparables entre sí sin
   reservas por este motivo. La ventana del 16 al 19 de marzo es la única que
   arrastra etiquetas de un clasificador anterior.
-- **Las 193 piezas con temas vacíos son todas de esa misma ventana**, no un
-  denominador parcial de un régimen posterior. De ellas, 49 recibirían tema con
-  el clasificador actual. No sirven como denominador de nada.
+- **Las piezas con temas vacíos son todas de esa misma ventana**, no un
+  denominador parcial de un régimen posterior. Eran 193 antes del sellado y son
+  239 después. No sirven como denominador de nada.
 
-Sellar el corpus es por tanto barato y de riesgo acotado: reescribiría 265
-etiquetas de 13.761, todas en los cuatro primeros días, y estamparía la huella
-en el resto sin tocarlas.
+### El sellado, aplicado el 2026-09-11
+
+| | |
+|---|---|
+| Etiquetas reescritas | 265, todas del 16 al 19 de marzo |
+| Piezas selladas | 13.761, ninguna queda con `clasificador_version` a NULL |
+| Verificación | Las 13.761 etiquetas releídas coinciden con lo previsto: 0 discrepancias |
+
+Las etiquetas anteriores de esas 265 piezas quedan en
+[`sellado-2026-09-11-etiquetas-anteriores.json`](sellado-2026-09-11-etiquetas-anteriores.json),
+que es lo que hace la operación reversible. Las otras 13.496 no se tocaron: el
+clasificador de hoy reproduce su etiqueta exactamente.
+
+Consecuencia para cualquier cifra ya publicada sobre la ventana del 16 al 19 de
+marzo: cambia un poco. Economía gana 92 etiquetas en el corpus, y política y
+medio ambiente pierden 37 y 33.
 
 ## 6 · Qué queda por hacer
 
-1. **Sellar el corpus histórico** con `scripts/reclasificar.py --aplicar`. La
-   medida en seco ya está hecha (apartado 5): 1,9 % de deriva, toda en los
-   cuatro primeros días. Requiere el modelo de spaCy y conexión directa a
-   Postgres: sin vectores el clasificador etiqueta distinto, y el script se
-   niega a escribir en ese caso.
-2. **Reconstruir el agregado léxico**, hoy a cero filas, para que el segundo
+1. **Reconstruir el agregado léxico**, hoy a cero filas, para que el segundo
    nivel de agenda vuelva a ser calculable y estrene el corte mensual.
-3. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
+2. **Decidir sobre el user-agent** (amenaza A9): es una decisión editorial, no
    técnica, y el volumen de peticiones se ha multiplicado por cuatro.
-4. **Diagnosticar o retirar las dos cabeceras muertas**, para que el universo
+3. **Diagnosticar o retirar las dos cabeceras muertas**, para que el universo
    declarado y el efectivo coincidan.
-5. **Vigilar el crecimiento**: del orden de 1.500 filas diarias de noticias más
+4. **Vigilar el crecimiento**: del orden de 1.500 filas diarias de noticias más
    las observaciones. Si la cuota de Supabase se agota, el pipeline falla en
    silencio, porque `scheduler.py` captura las excepciones sin propagarlas.
 

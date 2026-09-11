@@ -14,10 +14,16 @@ solo un pipeline. Antes de tocar la ingesta o de calcular cualquier cifra, leer:
   realmente en el código, el esquema y el corpus. Verificado el 2026-09-10.
 
 Los cinco cambios de instrumentación (R1–R5) están implementados desde el
-2026-09-10, pero **el corpus acumulado sigue siendo todo del régimen antiguo**:
-lo que el cuaderno da por medible lo será a partir de la primera tirada del
-pipeline nuevo, no hacia atrás. Cualquier afirmación sobre lo que el
-observatorio «ya mide» debe comprobarse contra el segundo documento.
+2026-09-10 y el corpus histórico quedó sellado el 2026-09-11, pero **el corpus
+acumulado sigue siendo todo del régimen antiguo**: lo que el cuaderno da por
+medible lo será a partir de la primera tirada del pipeline nuevo, no hacia
+atrás. Cualquier afirmación sobre lo que el observatorio «ya mide» debe
+comprobarse contra el segundo documento.
+
+**La prueba de régimen ha cambiado.** El cuaderno dice que
+`clasificador_version IS NULL` identifica el tramo antiguo; tras el sellado eso
+ya no vale, porque todo el histórico lleva huella. Usar `fecha_pub_origen IS
+NULL`, o la ausencia de observaciones para esa pieza.
 
 ## Reglas metodológicas de obligado cumplimiento
 
