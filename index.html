@@ -1058,9 +1058,15 @@ function wcScopeKey() {
 }
 
 async function fetchWordcloudTerms(scopeKey) {
+  // El filtro por periodo es obligatorio desde que el agregado guarda, además
+  // del acumulado, un corte por mes: sin él, la misma palabra volvería hasta
+  // nueve veces para el mismo ámbito, una por periodo, y la nube saldría con
+  // términos repetidos y pesos que no son los que dice la escala.
+  // '__all__' es el corpus entero, que es lo que esta tarjeta muestra.
   const url = SUPABASE_URL + '/rest/v1/wordcloud_terms'
     + '?select=term,score,doc_freq'
     + '&scope_key=eq.' + encodeURIComponent(scopeKey)
+    + '&periodo=eq.__all__'
     + '&order=score.desc&limit=55';
   const res = await fetch(url, {
     headers: {
