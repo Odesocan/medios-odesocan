@@ -324,6 +324,42 @@ def _headers_navegador(ua: str, es_feed: bool = False) -> dict:
 
 # ── Cliente HTTP con reintentos ───────────────────────────────────────────────
 
+# Códigos que significan «vuelve más tarde», no «esto no existe». Un 429 no se
+# trata como un 404: en la primera tirada completa desde Actions, EFE devolvió
+# un único 429 y la cabecera se quedó a cero piezas, porque el cliente no
+# reintentaba ningún 4xx.
+CODIGOS_REINTENTABLES = frozenset({429, 503})
+
+# Tope de la espera que pide el servidor. Sin él, un Retry-After de una hora
+# dejaría el job colgado hasta que lo mate el tiempo límite.
+ESPERA_MAXIMA_SERVIDOR = 60.0
+
+
+def segundos_retry_after(respuesta) -> Optional[float]:
+    """
+    Lee la cabecera `Retry-After`, que el servidor manda con un 429 o un 503.
+
+    Admite las dos formas del estándar: segundos ("120") y fecha HTTP
+    ("Wed, 11 Sep 2026 15:00:00 GMT"). Devuelve None si no viene o no se
+    entiende, para que decida quien llama.
+    """
+    cabecera = (respuesta.headers.get("retry-after") or "").strip()
+    if not cabecera:
+        return None
+    try:
+        return max(0.0, float(cabecera))
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+
+        momento = parsedate_to_datetime(cabecera)
+        if momento.tzinfo is None:
+            momento = momento.replace(tzinfo=timezone.utc)
+        return max(0.0, (momento - datetime.now(timezone.utc)).total_seconds())
+    except Exception:
+        return None
+
 class ClienteHTTP:
     def __init__(self):
         # Sin headers fijos: se establecen por petición con UA rotativo
@@ -373,6 +409,7 @@ class ClienteHTTP:
 
         for intento in range(1, SCRAPER["max_reintentos"] + 1):
             ua = self._ua()
+            espera_pedida = None   # la que pida el servidor, si pide alguna
             try:
                 _esperar(feed=es_feed)
                 r = self.client.get(url, headers=_headers_navegador(ua, es_feed=es_feed))
@@ -385,20 +422,32 @@ class ClienteHTTP:
                 else:
                     log.warning("Respuesta sospechosamente corta (%d bytes) para %s", len(html), url)
             except httpx.HTTPStatusError as e:
+                codigo = e.response.status_code
                 log.warning(
                     "HTTP %s en %s (intento %d, UA: ...%s)",
-                    e.response.status_code,
+                    codigo,
                     url,
                     intento,
                     ua[-30:],
                 )
-                if e.response.status_code < 500:
-                    break   # 4xx: no reintentar, pero caer al stale-if-error
+                if codigo in CODIGOS_REINTENTABLES:
+                    # El servidor pide esperar, así que se espera lo que pida y
+                    # no lo que nos venga bien. Es lo cortés y lo que dice el
+                    # estándar.
+                    pedida = segundos_retry_after(e.response)
+                    if pedida is not None:
+                        espera_pedida = min(pedida, ESPERA_MAXIMA_SERVIDOR)
+                        log.info("  %s pide esperar %.0fs (Retry-After)", url, espera_pedida)
+                    else:
+                        espera_pedida = min(8.0 * intento, ESPERA_MAXIMA_SERVIDOR)
+                elif codigo < 500:
+                    break   # 4xx de verdad: no reintentar, caer al stale-if-error
             except (httpx.RequestError, httpx.TimeoutException) as e:
                 log.warning("Error red en %s (intento %d): %s", url, intento, e)
 
             if intento < SCRAPER["max_reintentos"]:
-                espera = 2 ** intento + random.uniform(0, 1.5)
+                espera = (espera_pedida if espera_pedida is not None
+                          else 2 ** intento + random.uniform(0, 1.5))
                 log.info("Reintentando en %.1fs…", espera)
                 time.sleep(espera)
 
