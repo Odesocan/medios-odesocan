@@ -24,6 +24,11 @@ for d in [DATA_DIR, CACHE_DIR, LOG_DIR]:
 #   tipo  → "rss_only" | "html_only" | "rss+html"
 #   selectores → CSS selectors para extraer titulares del HTML (si aplica)
 #   html_url_regex / html_url_excludes → filtros opcionales sobre URLs HTML
+#
+# Ya no hay clave `max_items` por medio: desde R1 la portada se recorre entera,
+# porque las piezas sin tema son el denominador de cualquier medida de
+# saliencia. El único tope que queda es `tope_seguridad_listado`, que existe
+# para que un selector demasiado laxo no arrastre la web completa.
 
 MEDIOS = {
     "canarias7": {
@@ -34,9 +39,6 @@ MEDIOS = {
             "https://www.canarias7.es/rss/2.0/",
         ],
         "tipo": "rss+html",
-        # Cuota moderada: RSS trae ~50 items; aumentada de 20→30 para capturar
-        # más artículos regionales que rotan rápido en portada
-        "max_items": 30,
         "selectores": {
             "titular": "h2.article-title a, h3.article-title a, article h2 a, h2 a, h3 a",
             "resumen": "p.article-summary, div.article-body p:first-of-type",
@@ -48,7 +50,6 @@ MEDIOS = {
         "url":     "https://www.laprovincia.es",
         "rss": [],
         "tipo": "html_only",   # RSS devuelve 404
-        "max_items": 30,
         # Plataforma CDS Prensa Ibérica: h6 también usado en modNews
         "selectores": {
             "titular": "h2 a, h3 a, h6 a",
@@ -63,7 +64,6 @@ MEDIOS = {
         "url":     "https://www.eldia.es",
         "rss": [],
         "tipo": "html_only",   # RSS devuelve 404
-        "max_items": 30,
         # Misma plataforma CDS Prensa Ibérica — URL regex filtra navegación y ticker
         "selectores": {
             "titular": "h2 a, h3 a",
@@ -79,7 +79,6 @@ MEDIOS = {
             "https://diariodeavisos.elespanol.com/feed/",
         ],
         "tipo": "rss+html",
-        "max_items": 30,
         # WordPress + Kadence Blocks (abril 2026): el tema cambió de Astra a Kadence.
         # Se añaden selectores para wp-block-kadence-advancedheading y kt-adv-heading,
         # manteniendo los anteriores como fallback por si la plantilla varía entre secciones.
@@ -98,7 +97,6 @@ MEDIOS = {
         "url":     "https://www.laopinion.es",
         "rss": [],
         "tipo": "html_only",   # RSS redirige a epe.es (grupo editorial, no el medio)
-        "max_items": 25,
         "selectores": {
             "titular": "h2 a, h3 a, .article-title a",
             "resumen": ".article-summary, p.subtitle",
@@ -110,7 +108,6 @@ MEDIOS = {
         "url":     "https://www.elpueblocanario.es",
         "rss": [],
         "tipo": "html_only",   # robots.txt bloquea el feed RSS
-        "max_items": 25,
         "selectores": {
             "titular": "h2 a, h3 a, .entry-title a, article a",
             "resumen": ".entry-excerpt, .entry-summary, p.lead",
@@ -125,7 +122,6 @@ MEDIOS = {
         "url":     "https://www.canariosnoticias.es",
         "rss": [],
         "tipo": "html_only",   # robots.txt bloquea el feed RSS
-        "max_items": 25,
         "selectores": {
             "titular": "h2 a, h3 a, .entry-title a, article a",
             "resumen": ".entry-excerpt, .entry-summary, p.lead",
@@ -142,7 +138,6 @@ MEDIOS = {
         "tipo": "html_only",   # La portada opera dentro de eldiario.es (React SPA)
         # React SPA: el DOM llega vacío con httpx → necesita Playwright
         "playwright": True,
-        "max_items": 25,
         "selectores": {
             "titular": "p.title a, a.post-title, .ni-title a",
             "resumen": "p",
@@ -163,7 +158,6 @@ MEDIOS = {
         "url":     "https://www.atlanticohoy.com/",
         "rss": [],
         "tipo": "html_only",
-        "max_items": 25,
         # CMS propio (abril 2026): el patrón principal de titulares usa c-item__title.
         # Se priorizan selectores verificados en DOM y se mantienen los anteriores como fallback.
         "selectores": {
@@ -184,7 +178,6 @@ MEDIOS = {
         "url":     "https://eltime.es/",
         "rss": [],
         "tipo": "html_only",   # RSS existe pero devuelve feed vacío
-        "max_items": 25,
         # Joomla 2.5/3.x — IceTheme Newsy 3 (it_newsy3)
         # Verificado abril 2026: allmode_title ya no existe en el DOM;
         # los titulares usan h3 y h4 con enlaces directos.
@@ -203,7 +196,6 @@ MEDIOS = {
             "https://gomeraverde.es/coverrss",
         ],
         "tipo": "rss+html",
-        "max_items": 25,
         # folioePress CMS (CodeIgniter) — portada usa h3, no h1
         # Verificado en abril 2026: titulares en <h3> anidados en <a>
         "selectores": {
@@ -221,7 +213,6 @@ MEDIOS = {
             "https://www.lancelotdigital.com/?format=feed&type=rss",
         ],
         "tipo": "rss+html",
-        "max_items": 25,
         # Joomla 4.x/5.x — Verificado abril 2026: los selectores nspHeader y
         # mod-articles-category-title ya no están en el DOM. Los titulares usan
         # h3 > a directamente, con categorías en texto plano adyacente.
@@ -241,7 +232,6 @@ MEDIOS = {
             "https://elhierrohoy.es/feed/",
         ],
         "tipo": "rss+html",
-        "max_items": 20,
         # WordPress + Elementor Pro (Hello Elementor theme)
         # Verificado en abril 2026: los titulares usan h2, no h1.
         # Selector anterior (.elementor-widget-theme-post-title h1...) no coincidía.
@@ -261,7 +251,6 @@ MEDIOS = {
             "https://www.lavozdefuerteventura.com/rss/",
         ],
         "tipo": "rss+html",
-        "max_items": 25,
         # OpenNemas CMS — Verificado abril 2026: las clases h2.title y div.data-title
         # ya no aparecen en el HTML renderizado. Se amplían selectores genéricos.
         # El RSS es la fuente principal; HTML es fallback complementario.
@@ -640,12 +629,21 @@ SCRAPER = {
     "timeout": 15,
     # Máximo de reintentos ante error 5xx o timeout
     "max_reintentos": 3,
-    # Máximo de noticias a guardar por medio y ejecución
-    "max_items_por_medio": 50,
-    # Días que se conserva el caché HTML
+    # Tope de seguridad del listado, no cuota de muestreo (R1). La portada se
+    # recorre entera; esto solo evita que un selector demasiado laxo arrastre
+    # media web. Si un medio lo alcanza de verdad, hay que revisar su selector.
+    "tope_seguridad_listado": 300,
+    # Presupuesto de texto completo por medio y tirada (R1). Es el único
+    # recorte que queda del pipeline y afecta al encuadre, no a la saliencia:
+    # solo lo gastan las piezas nuevas y con tema.
+    "texto_full_por_tirada": 15,
+    # Días que se conserva el caché HTML de los ARTÍCULOS. Los listados nunca
+    # se sirven de caché: con cuatro tiradas diarias, una portada cacheada
+    # fabricaría permanencia falsa en la tabla de observaciones (R2).
     "cache_ttl_dias": 7,
-    # robots.txt desactivado: monitoreo académico con 1 ejecución/día,
-    # menos tráfico que un lector humano
+    # robots.txt desactivado: monitoreo académico con 4 ejecuciones diarias de
+    # listado, menos tráfico que un lector humano. Decisión pendiente de
+    # revisión editorial (amenaza A9 del cuaderno metodológico).
     "respetar_robots": False,
 }
 

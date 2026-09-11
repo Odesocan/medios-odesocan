@@ -1,0 +1,2777 @@
+{
+ "fecha": "2026-09-11",
+ "clasificador_nuevo": "v2-29e00cc2d46f-es_core_news_md",
+ "motivo": "Sellado del corpus historico (R3). Etiquetas anteriores de las piezas cuyo etiquetado cambia al reclasificar. Las otras 13.496 piezas conservan su etiqueta.",
+ "piezas": [
+  {
+   "url_hash": "be64d044b9c0fcff",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia",
+    "politica",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "99ea1a0efcce293f",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "228c98cdfdab1dce",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "c03b09322cca95f4",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "f0dea0f268a408c8",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "ad52787db205cbd6",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "9074cb7eefbd403c",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "922be8de5475f9d7",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e04bbc223c4a7d45",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "25aee99230b48544",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "72a7d9a20f25c003",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "83b4ac8060dcf0f6",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "justicia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "0b8cf86ca4885573",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "3e3be4cf95b4134b",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "a17085d05920a72f",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "289b47a1bd894246",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "8eacdfa7fc4b95cc",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "bb2ee84704aea9c3",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "e2e906de73b894dd",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "justicia",
+    "violencia_genero"
+   ]
+  },
+  {
+   "url_hash": "cc04572879c96ad3",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "cd4b0cd1186c97c8",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "fb4f78119dce83b8",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "79281918ef33ef1c",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad",
+    "turismo"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "114234f30fb38f0b",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "e9c3a95d13e10606",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "7db8cee83d727f4a",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "ba93a36509298884",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "b5624da2231fe301",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "42a80229615103ed",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "297187547eb781dc",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "6e529bdb0de51d4a",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "698328f3ae1ab7d5",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "f6e0f77e90e10720",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "e60a795bed9cfe26",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "8145d67fd4b59114",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "2e305798381902d4",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e59a05191394e7ce",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "violencia_genero"
+   ]
+  },
+  {
+   "url_hash": "6f8d676d873789ef",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia",
+    "vivienda"
+   ]
+  },
+  {
+   "url_hash": "b991d597811ab342",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "621299c3081942cd",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "f9332ca94570e5ab",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "c069aac32776ce05",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "a7c76eb42224a007",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "1d2f5054b6e4e249",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "a3b5d4b3e49c49c3",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "485cd136e0b76daf",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "e0fbc53b7011e0c3",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "4bb17155ad122f16",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "d205f607f1fa42c6",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "74065088a69d60b0",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "4c4216691efab0e7",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "d588be6bba6fd743",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "ab80318582be30dd",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "c17f9cbb114d311a",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "975e234a1da212af",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "f5a327ec8e134bea",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "5539c5191db9b931",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "fb3647410dfee073",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "386be70f0c45fd80",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "ee0b9050b5f43ff2",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "51a51bbdd271e271",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "1730fce84138a7ca",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "2f7c36ffa03098b5",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "c1de31e6e9d6ee4c",
+   "medio": "laprovincia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "b1cfe8a5cb8d2d0c",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "ead980da54a58edd",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "f86d301d1ba2386d",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "9e62b45e461b0a74",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "c732125b65111673",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "5140322bb604b053",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "e61cea02ca4b234a",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "49711b2720486e6b",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica",
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "782c078c4aac32da",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "46a83b659ac3555f",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "3bab52b28ba8a695",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "4e0277c78e564070",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "b6c99077941bd173",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "b62a418cd4476b96",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "f02f3c418d3633d4",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "8e0691c6767c4a14",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "5cf7a6e2a12485ca",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "c7a62db6ab1bb515",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "51fcce8863c85a32",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "a34e7a51358a7e88",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "7af5b164f09b29e8",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "53d530d7ae917aaf",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "64c380904c9fa89c",
+   "medio": "eldia",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "3f3bec076e087152",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "f40f5e08b9fd131b",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "805b699b3991ead3",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "34aa001edbaa828b",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "58f66ffe37b1e216",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "b27301cbb67b4cfd",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "1997924940b343b3",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "82c26ee4cf7c8706",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "politica",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "6dc96cf08a2a0229",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e446d49f04f88d33",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "67c8ec4a6d7a504c",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "ebe5c4b4e703439b",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "7332aafc99aba35d",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "vivienda"
+   ]
+  },
+  {
+   "url_hash": "ba36b46c4b6499fc",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "9b632d838d12a4d5",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "796e958d67165fc8",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e0eb8575e39301a2",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "ae260c57e742eb32",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "fa93e3efb321eb15",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "06d66c7609d3734b",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "migracion"
+   ],
+   "temas_despues": [
+    "migracion",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "1477f14803ab2a74",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "7b3ad3df0b06cbdd",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "011334ed201c0c89",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "7f757cd50ff997a7",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "21086c7143d1ebad",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "4016018637067569",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "diversidad",
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "73f2456411cd951c",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "38081b9409ba9318",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "450aa4be6f4947b9",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "e900387c107e73da",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia",
+    "presupuestos",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "09a1ef786f308385",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "18ff9de31d0e52c8",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "b9def26ef23849d5",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e36760a8c9731a79",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "44df24f73ab44371",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "4c5d699ca1e2403d",
+   "medio": "laopinion",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "04d7886467687438",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "justicia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "27eba478c1561261",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "53f1143ad0b20092",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "4366b5942fcd92b7",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-16",
+   "temas_antes": [],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "175b7c07f496ba49",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "salud_mental"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "c6bb29ffaa1b1dd6",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "c880ec03c9e154cd",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "politica",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "51df111dec4486cc",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "7cc44a81b4ecc6cf",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "9a16d45b7a5ab6b0",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "8cee53a3a9a2b8c9",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "290bdf39b6879127",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia",
+    "sanidad",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "economia",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "4bf0b90b8b63cb06",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica",
+    "salud_mental"
+   ],
+   "temas_despues": [
+    "salud_mental"
+   ]
+  },
+  {
+   "url_hash": "19e290421eb37a9b",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "13b1e428126d7b00",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "59948e04665c6327",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "beab6f0f44d05112",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "17aef4053e18386a",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": [
+    "economia",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "9fad73af04e48007",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "2a0ed31f25885f13",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": [
+    "medio_ambiente",
+    "politica",
+    "vivienda"
+   ]
+  },
+  {
+   "url_hash": "4aa5e70359e65ac1",
+   "medio": "canariasahora",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "b7410505409aed5d",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "0590467c12c48989",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "1f8f535097f59a94",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "economia",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "7fc63ab0ebdc237d",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": [
+    "economia",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "f300eb045f4fd24e",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "turismo"
+   ],
+   "temas_despues": [
+    "economia",
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "1be740f9be9a88d7",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "c0e3246d0040e35a",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "7155b9a7e33c2d2a",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "turismo",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "315d6366954eff26",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "02b3b1df12f10be6",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "6cd1e96e2635febf",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "254d1bbc05e2b867",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "065ab6993f1a2e7c",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "84ca606067a816f9",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "12297ab78dd7a76f",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "violencia_genero"
+   ]
+  },
+  {
+   "url_hash": "5aea250864c17c97",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "91b3f33151ac7778",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "economia",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "7a2b9b91855a93a7",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "medio_ambiente",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "9058671bdcc6019c",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "2904aba73e01680e",
+   "medio": "canarias7",
+   "dia": "2026-03-16",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "abaaa9b7d590fc9e",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "06e7a207d0229fd5",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "0e02b5836e70f756",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "d94bdab389f021d7",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "88e865afc85fb946",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "economia",
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "d774e5078364d5a2",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "7ee59305fb0b8b63",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "9d8e7ec18bfcfdef",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "ee2d918dbf97e82f",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "754e30dd175008ed",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "6b9f4a594b237cf0",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "migracion",
+    "turismo"
+   ],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "7086f2f99e32bc60",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "politica",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "justicia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "f55501b133ab32a3",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "ce8b665b48f9005e",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "sanidad",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "7838c38f81c11e03",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "migracion"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "1e27211ea1a012d3",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "e9410b158e531e95",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "07ac632be07a57bb",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "economia",
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "ab45ea3564d5c619",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "56223d0b1dabe260",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "e40987700e3d050e",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "dependencia_discapacidad",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "economia",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "53b6f7fff41178ee",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "dependencia_discapacidad"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "3978ec50802312e7",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "557ff88202e8af40",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": [
+    "economia",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "5bbf21e8a461ce76",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "dbce7639f259b15b",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "54d72a2a3acc440a",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "7ab95e51f4f588a5",
+   "medio": "canariasahora",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "bd31e61ab3566aca",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "37fc1525ea35d9e6",
+   "medio": "canarias7",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "politica",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "6b9d22d7a59ff958",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-17",
+   "temas_antes": [
+    "dependencia_discapacidad",
+    "politica",
+    "sanidad"
+   ],
+   "temas_despues": [
+    "politica",
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "b5609baa55aeec37",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "843d99807711e5ca",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "sanidad",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "sanidad"
+   ]
+  },
+  {
+   "url_hash": "81854cb3c6a6b655",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "b89b3e4d15d5869c",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica",
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "3962f5854fde2421",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "eef81c6639c3fdab",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "f0a13159956a697d",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "33a32ae492463230",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "cf7925c19954f376",
+   "medio": "canarias7",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "3f95c4448e0f6d32",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "4e230a68908d9f7c",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "4bc7f77e5675cf26",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "3f7e0ab22ce71a71",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "d486e83be4a0fee9",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "d08e362947cbaf5a",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "da5b32743331a537",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica",
+    "turismo"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "fda88d6fb73d057d",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "ce0571731090fb9c",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "5f0dab47f5d2846a",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "24dee55051d5bc3e",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "3217d28925e6557f",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos",
+    "turismo"
+   ],
+   "temas_despues": [
+    "justicia",
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "508cd05dd82e740b",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "b82c88dcca1b3160",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "presupuestos",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "vivienda"
+   ]
+  },
+  {
+   "url_hash": "bb006e3855eff27c",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "turismo"
+   ],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "31fdd1201f17d16b",
+   "medio": "laprovincia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "turismo"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "5ea0f87f2ef39405",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "economia",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "3714570aad51a4bd",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "dee2f000d3614511",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "e95fbc24d455008c",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "a7c01faefa848b22",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica",
+    "turismo"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "9866b21d28d5f159",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "1639772d29bf18ed",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "e5140359e7aaa49a",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "violencia_genero"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "28343cc01e8163a5",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "8e3d1ead316d1b1a",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "adbcf365a2ba93b6",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "vivienda"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "039a9f0feb1c7dbd",
+   "medio": "eldia",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "84924badaee8c066",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "a2c3007f53800fe3",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "10eee9c80bbcfea9",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "f2dbcffaa67e0453",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "5c5436605e630c2f",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente",
+    "turismo"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente",
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "914bb7528ea5d3dd",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "3b5248cfc7d801b5",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "3b723b9a785a3c70",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "cf5e8045144735c7",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "46afe2321d690f36",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "482257cc00c44341",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "5ae50e3d4c8d9c9b",
+   "medio": "diariodeavisos",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "f636c680413065b5",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos",
+    "turismo"
+   ],
+   "temas_despues": [
+    "justicia",
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "5109c0944efc5cbb",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "8f6a636012aa320c",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente",
+    "politica"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "567375bf9968a22f",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente",
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "1579f41b6efbb2c4",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente",
+    "violencia_genero"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "0d738ae342bbccc3",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "0576ca062c7c7b8e",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "economia",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "bc5156dd9f068de7",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos",
+    "turismo"
+   ],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "4285498e99426c6e",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "politica",
+    "turismo"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "60c44443a98e58f8",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "migracion",
+    "politica"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "0836e09a16a1b2da",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "presupuestos"
+   ],
+   "temas_despues": [
+    "justicia"
+   ]
+  },
+  {
+   "url_hash": "52c7fd269a76ecbf",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "sanidad"
+   ],
+   "temas_despues": [
+    "politica"
+   ]
+  },
+  {
+   "url_hash": "7247e09609bcc5b1",
+   "medio": "canariasahora",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "turismo"
+   ],
+   "temas_despues": [
+    "turismo"
+   ]
+  },
+  {
+   "url_hash": "6c1c8b3d735eda3e",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "63e9b4db8871e3eb",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "27070fdefc5b7a73",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "81238128b69aae35",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "medio_ambiente"
+   ],
+   "temas_despues": [
+    "economia",
+    "medio_ambiente"
+   ]
+  },
+  {
+   "url_hash": "a19c2ac9c929b0e5",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "economia",
+    "presupuestos"
+   ]
+  },
+  {
+   "url_hash": "9ead9be5690f817e",
+   "medio": "atlanticohoy",
+   "dia": "2026-03-18",
+   "temas_antes": [
+    "economia",
+    "vivienda"
+   ],
+   "temas_despues": [
+    "economia"
+   ]
+  },
+  {
+   "url_hash": "9ad32d4b0478ab71",
+   "medio": "elhierrohoy",
+   "dia": "2026-03-19",
+   "temas_antes": [
+    "politica"
+   ],
+   "temas_despues": []
+  },
+  {
+   "url_hash": "3a99f7bf2182fb4c",
+   "medio": "lavozdefuerteventura",
+   "dia": "2026-03-19",
+   "temas_antes": [
+    "economia"
+   ],
+   "temas_despues": [
+    "economia",
+    "politica"
+   ]
+  }
+ ]
+}

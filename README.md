@@ -1,15 +1,27 @@
 # medios-odesocan
 
-Observatorio de medios canarios de ODESOCAN: scraping diario de la prensa
-canaria, clasificación temática y volcado a Supabase, con un dashboard estático
-publicado en GitHub Pages.
+Observatorio de medios canarios de ODESOCAN: scraping de la prensa canaria
+cuatro veces al día, clasificación temática y volcado a Supabase, con un
+dashboard estático publicado en GitHub Pages.
+
+## Metodología
+
+El observatorio es un instrumento de medida, no solo un pipeline. Antes de
+calcular o publicar cualquier cifra:
+
+- [`docs/CUADERNO_METODOLOGICO.md`](docs/CUADERNO_METODOLOGICO.md) — qué mide el
+  instrumento, qué puede medir y qué no (agenda, encuadre, priming, precedencia).
+- [`docs/estado-instrumentacion.md`](docs/estado-instrumentacion.md) — estado
+  verificado del código, el esquema y el corpus a 2026-09-10, y en qué diverge
+  del cuaderno.
 
 ## Pipelines
 
 | Workflow | Fichero | Cadencia | Estado |
 |---|---|---|---|
-| Scraping medios canarios | `.github/workflows/scraping.yml` | diaria, 10:00 UTC | operativo |
+| Scraping medios canarios | `.github/workflows/scraping.yml` | cada 6 h (02, 08, 14, 20 UTC) | operativo |
 | Build Wordcloud Terms | `.github/workflows/build-wordcloud.yml` | diaria, 12:00 UTC | operativo |
+| Comprobaciones | `.github/workflows/tests.yml` | en cada push | operativo |
 
 GitHub encola los `schedule` con retraso variable: la hora real de arranque
 puede desplazarse varias horas respecto al cron. Es comportamiento de la
@@ -19,12 +31,33 @@ plataforma, no un fallo del repositorio.
 
 `scheduler.py --run-now` encadena:
 
-1. `scraper.py` — recorre los medios de `config.py` (RSS + HTML), extrae los
-   artículos y los guarda en SQLite (`data/noticias.db`, efímero en CI).
-2. `clasificador.py` — asigna temas; las noticias sin tema se descartan.
-3. `supabase_loader.py` — sincroniza lo nuevo contra `medios.noticias` en
-   Supabase por conexión Postgres directa (`psycopg2`).
+1. `scraper.py` — recorre los medios de `config.py` (RSS + HTML) y guarda en
+   SQLite (`data/noticias.db`, efímero en CI) dos cosas distintas: las piezas
+   nuevas y una observación por pieza y tirada.
+2. `clasificador.py` — asigna temas. Las noticias sin tema **no se descartan**:
+   se guardan con el array vacío, porque son el denominador de cualquier medida
+   de saliencia. Quien no las quiera, que filtre en la consulta; la vista
+   pública `v_noticias_medios` ya lo hace por el dashboard.
+3. `supabase_loader.py` — sincroniza lo nuevo contra `medios.noticias` y
+   `medios.observaciones` en Supabase por conexión Postgres directa
+   (`psycopg2`).
 4. `generate_dashboard.py` — ver más abajo.
+
+Qué registra cada pieza, y por qué importa, está en
+[`docs/CUADERNO_METODOLOGICO.md`](docs/CUADERNO_METODOLOGICO.md). En resumen:
+
+| Columna | Qué es | Sin ella no se puede medir |
+|---|---|---|
+| `temas = '{}'` | Pieza fuera de la agenda de ODESOCAN | Saliencia relativa a la producción |
+| `observaciones` | Una fila por pieza y tirada | Duración de la atención, prominencia |
+| `fecha_pub_origen` | De dónde sale la fecha | Precedencia entre cabeceras |
+| `clasificador_version` | Huella del clasificador | Comparabilidad longitudinal |
+| `seccion` | Taxonomía nativa del medio | Validez del clasificador |
+
+El listado de portada se recorre entero y nunca se sirve de caché: una portada
+cacheada fabricaría permanencia falsa. Lo que sí tiene presupuesto es el texto
+completo, 15 artículos por cabecera y tirada, que solo gastan las piezas nuevas
+y con tema.
 
 Secrets que necesita (ya configurados): `SUPABASE_HOST`, `SUPABASE_PORT`,
 `SUPABASE_DBNAME`, `SUPABASE_USER`, `SUPABASE_PASSWORD`, `SUPABASE_SSLMODE`,
@@ -106,6 +139,22 @@ defecto): `SUPABASE_SOURCE_SCHEMA` (`medios`), `SUPABASE_SOURCE_TABLE`
 (`wordcloud_terms`), `WORDCLOUD_MAX_TERMS` (`80`), `WORDCLOUD_MIN_DOC_FREQ`
 (`2`).
 
+## Sellado del corpus histórico
+
+`scripts/reclasificar.py` vuelve a pasar el clasificador por el corpus y sella
+cada pieza con su huella. Su modo por defecto es en seco: mide cuánta deriva
+hay antes de sobrescribir etiquetas con las que ya se han publicado cifras.
+
+```bash
+python scripts/reclasificar.py                    # mide la deriva, no escribe
+python scripts/reclasificar.py --solo-sin-sellar --aplicar
+```
+
+Necesita el modelo de spaCy cargado: sin vectores el clasificador etiqueta
+distinto, y sellar desde una máquina sin modelo dejaría una huella que no se
+corresponde con la del pipeline en producción. El script se niega a escribir en
+ese caso salvo `--forzar-sin-modelo`.
+
 ## Desarrollo local
 
 ```bash
@@ -113,7 +162,13 @@ pip install -r requirements-ci.txt
 python -m spacy download es_core_news_md
 python scheduler.py --run-now      # scraping + sync + dashboard
 python generate_dashboard.py --dry-run
+python -m unittest discover -s tests -v
 ```
+
+Las comprobaciones de `tests/` no prueban los selectores de cada cabecera, que
+dependen de la web real: prueban que el pipeline registra lo que el cuaderno
+metodológico dice que registra. Si una se pone en rojo, alguna serie deja de
+ser calculable.
 
 `requirements.txt` solo contiene el cliente `supabase`, que es lo único que
 necesita `scripts/build_wordcloud_terms.py`. El resto del pipeline usa

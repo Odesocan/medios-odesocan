@@ -1,0 +1,40 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Comprobaciones de instrumentación — ODESOCAN
+# Verifica que el pipeline sigue registrando lo que el cuaderno metodológico
+# dice que registra: denominador, observaciones, sello del clasificador,
+# procedencia de la fecha y corte temporal del agregado.
+#
+# No toca la red ni la base de datos: usa HTML de prueba y SQLite temporal.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Comprobaciones
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # Solo lo que necesitan las comprobaciones. spaCy no hace falta: el
+      # clasificador funciona sin vectores, y los tests no dependen de su
+      # criterio, sino de que el pipeline guarde lo que debe guardar.
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install feedparser httpx beautifulsoup4 lxml
+
+      - name: Ejecutar comprobaciones
+        run: python -m unittest discover -s tests -v

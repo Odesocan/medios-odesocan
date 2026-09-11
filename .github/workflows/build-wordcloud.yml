@@ -3,11 +3,16 @@
 # Recalcula el agregado textual `medios.wordcloud_terms` a partir de las
 # noticias que el scraping diario deja en Supabase.
 #
-# ESTADO ACTUAL (auditoría 2026-08-28): el pipeline NO está aprovisionado.
-# Faltan las tres piezas que documenta el README (sección "Word cloud
-# agregada"). Mientras falte alguna, el paso de build se omite de forma
-# controlada y el motivo se publica en el resumen del job, en lugar de
-# reventar con un traceback en cada ejecución.
+# ESTADO (2026-09-11): aprovisionado y operativo. Entre el 7 y el 11 de
+# septiembre el job estuvo en rojo cuatro días seguidos: la tabla había ganado
+# la columna `periodo` en su clave primaria (R5) y el `on_conflict` del script
+# aún nombraba la clave de tres columnas, así que PostgREST devolvía 42P10.
+# Como el script trunca la tabla ANTES de insertar, cada ejecución la dejaba
+# vacía y el dashboard caía a su cálculo en cliente sobre titulares.
+#
+# Si faltan los secrets, el paso de build se omite de forma controlada y el
+# motivo se publica en el resumen del job, en lugar de reventar con un
+# traceback en cada ejecución.
 # ──────────────────────────────────────────────────────────────────────────────
 
 name: Build Wordcloud Terms
@@ -92,4 +97,10 @@ jobs:
           SUPABASE_TARGET_TABLE: ${{ vars.SUPABASE_TARGET_TABLE || 'wordcloud_terms' }}
           WORDCLOUD_MAX_TERMS: ${{ vars.WORDCLOUD_MAX_TERMS || '80' }}
           WORDCLOUD_MIN_DOC_FREQ: ${{ vars.WORDCLOUD_MIN_DOC_FREQ || '2' }}
+          # Corte temporal del agregado (R5): meses de serie que se conservan,
+          # piezas mínimas para que un ámbito mensual no sea ruido, y si el
+          # vocabulario se calcula solo sobre las piezas con tema.
+          WORDCLOUD_MONTHS: ${{ vars.WORDCLOUD_MONTHS || '12' }}
+          WORDCLOUD_MIN_DOCS_PERIODO: ${{ vars.WORDCLOUD_MIN_DOCS_PERIODO || '5' }}
+          WORDCLOUD_SOLO_CON_TEMA: ${{ vars.WORDCLOUD_SOLO_CON_TEMA || '1' }}
         run: python scripts/build_wordcloud_terms.py
