@@ -537,3 +537,41 @@ class SeleccionDeCabeceras(unittest.TestCase):
     def test_una_errata_es_un_error_inmediato(self):
         with self.assertRaises(ValueError):
             self.sch.medios_solicitados("rtcv")
+
+
+class ExtraccionDelCuerpo(unittest.TestCase):
+    """
+    El contenedor con nombre propio gana a la etiqueta <article>: muchas
+    plantillas envuelven en <article> también las tarjetas de portada y los
+    directos, y empezar por ahí devuelve navegación con aspecto de texto.
+    """
+
+    PLANTILLA = """
+    <html><body>
+      <article>
+        <p>En Directo | La Aldea celebra la Fiesta del Charco En Directo | La Aldea celebra</p>
+        <p>En Directo | Otro rótulo de la escaleta que no es el cuerpo de la pieza</p>
+        <div class="wp-block-post-content">
+          <p>El Cabildo ha ofrecido una recepción oficial al club de lucha canaria
+             del municipio tras proclamarse campeón insular esta temporada.</p>
+          <p>El acto reunió a la corporación y a las familias de los luchadores en
+             un salón de plenos abarrotado durante toda la mañana del jueves.</p>
+        </div>
+      </article>
+    </body></html>
+    """
+
+    def test_gana_el_contenedor_con_nombre_propio(self):
+        texto = scraper.texto_desde_html(self.PLANTILLA, "https://ejemplo.es/pieza/")
+        self.assertIn("Cabildo ha ofrecido", texto)
+        self.assertNotIn("En Directo", texto)
+
+    def test_sigue_valiendo_article_cuando_no_hay_nada_mejor(self):
+        html = """<html><body><article>
+          <p>El Gobierno aprueba una línea de ayudas al alquiler para los hogares
+             con mayor esfuerzo residencial, según anunció la consejería.</p>
+          <p>La medida se suma al parque público de vivienda anunciado en julio y
+             se tramitará por la vía de urgencia el próximo trimestre.</p>
+        </article></body></html>"""
+        texto = scraper.texto_desde_html(html, "https://ejemplo.es/pieza/")
+        self.assertIn("ayudas al alquiler", texto)
