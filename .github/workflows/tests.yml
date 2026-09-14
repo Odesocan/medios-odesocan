@@ -31,10 +31,16 @@ jobs:
       # Solo lo que necesitan las comprobaciones. spaCy no hace falta: el
       # clasificador funciona sin vectores, y los tests no dependen de su
       # criterio, sino de que el pipeline guarde lo que debe guardar.
+      #
+      # psycopg2-binary SÍ hace falta, aunque las comprobaciones no toquen la
+      # base de datos: SeleccionDeCabeceras carga scheduler.py, que importa
+      # supabase_loader, que hace `import psycopg2` en el cuerpo del módulo.
+      # Basta con que el módulo se pueda importar. Versión igual a la de
+      # requirements-ci.txt para no abrir una segunda fuente de verdad.
       - name: Instalar dependencias
         run: |
           pip install --upgrade pip
-          pip install feedparser httpx beautifulsoup4 lxml
+          pip install feedparser httpx beautifulsoup4 lxml psycopg2-binary==2.9.10
 
       - name: Ejecutar comprobaciones
         run: python -m unittest discover -s tests -v
