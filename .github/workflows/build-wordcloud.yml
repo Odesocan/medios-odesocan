@@ -20,9 +20,15 @@ name: Build Wordcloud Terms
 on:
   workflow_dispatch:
   schedule:
-    # Una vez al día, después del scraping diario ("Scraping medios canarios",
-    # 10:00 UTC + ~15 min de ejecución). Antes era "15 * * * *" (cada hora):
-    # 24 ejecuciones diarias para una fuente que solo cambia una vez al día.
+    # Una vez al día. Antes era "15 * * * *" (cada hora): 24 ejecuciones
+    # diarias para una fuente que entonces solo cambiaba una vez al día.
+    #
+    # OJO (2026-09-14): desde R5 el scraping ya no es diario, son cuatro
+    # tiradas ("0 2,8,14,20 * * *"), así que este cron de las 12:00 UTC ya no
+    # va "después del scraping diario": va después de la tirada de las 08:00 y
+    # deja fuera del agregado las de 14:00 y 20:00 hasta el día siguiente. Se
+    # mantiene la cadencia diaria a propósito: subirla es una decisión sobre
+    # cada cuánto debe refrescarse el agregado, no un arreglo.
     - cron: "0 12 * * *"
 
 jobs:
