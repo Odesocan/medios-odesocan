@@ -16,6 +16,12 @@ psycopg2-binary==2.9.10
 
 # ── NLP ───────────────────────────────────────────────────────────────────────
 spacy==3.8.4
+# preshed 3.0.14 (publicado el 2026-10-24) rompe la carga de cualquier modelo de
+# spaCy 3.8.x, incluida la 3.8.16: `spacy.load("es_core_news_md")` falla en el
+# tokenizador con «OverflowError: Python int too large to convert to C
+# ssize_t». spaCy acepta cualquier preshed <3.1.0, así que sin esta fijación pip
+# instala la versión rota. Revisar antes de quitarla.
+preshed==3.0.13
 scikit-learn==1.5.2
 nltk==3.9.1
 
